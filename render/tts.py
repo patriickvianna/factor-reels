@@ -103,14 +103,26 @@ def synth_all(texts: list[str], voice: str) -> list[np.ndarray]:
     if os.environ.get("TTS_ENGINE") == "espeak":
         raw = [_espeak(t) for t in texts]
     elif voice.startswith("cb_"):
+        import asr
         raw = []
         for t in texts:
-            a = _trim(_chatterbox(t, voice, 0))
-            tries = 1
-            while not _ok_length(a, t) and tries < 3:
+            # até 3 tentativas: fica a que a conferência (Whisper) ouviu mais certo
+            best, best_w = None, 9.0
+            for tries in range(3):
                 a = _trim(_chatterbox(t, voice, tries))
-                tries += 1
-            raw.append(a)
+                if not _ok_length(a, t):
+                    continue
+                try:
+                    w = asr.line_wer(a, t)
+                except Exception:
+                    w = 0.0
+                if w < best_w:
+                    best, best_w = a, w
+                if w <= 0.25:
+                    break
+            if best is None:
+                raise RuntimeError(f"a voz cortou a fala: {t!r}")
+            raw.append(best)
     else:
         import roteiro
         raw = _kokoro_batch([roteiro.respell(t) for t in texts], voice)

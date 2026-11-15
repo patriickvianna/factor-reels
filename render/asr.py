@@ -51,3 +51,22 @@ def check(voice_wav: Path, script: dict) -> dict:
     ref = " ".join(ln["say"] for sc in script["scenes"] for ln in sc["lines"])
     score = round(wer(_norm(ref), _norm(heard)), 3)
     return {"wer": score, "ouvido": heard[:600], "ok": score <= MAX_WER}
+
+
+def _get_model():
+    global _model
+    from faster_whisper import WhisperModel
+    if _model is None:
+        _model = WhisperModel(os.environ.get("REELS_ASR_MODEL", "small"), device="cpu", compute_type="int8")
+    return _model
+
+
+def line_wer(audio_24k, text: str) -> float:
+    """Erro de uma fala só (usado para gerar de novo a frase que a voz embolou)."""
+    import numpy as np
+    a = np.asarray(audio_24k, dtype=np.float32)
+    idx = np.round(np.arange(0, a.size, 24000 / 16000)).astype(int)
+    a16 = a[idx[idx < a.size]]
+    segs, _ = _get_model().transcribe(a16, language="pt", beam_size=3, vad_filter=False, condition_on_previous_text=False)
+    heard = " ".join(x.text.strip() for x in segs)
+    return wer(_norm(text), _norm(heard))
