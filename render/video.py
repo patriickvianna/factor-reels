@@ -9,7 +9,6 @@ import json
 import subprocess
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
 
 HERE = Path(__file__).resolve().parent
 W, H, FPS = 1080, 1920, 30
@@ -36,6 +35,7 @@ def render(script: dict, timeline: dict, audio: Path, out_mp4: Path, cover_jpg: 
         "-r", str(FPS), "-g", str(FPS * 2),
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart", "-shortest", str(out_mp4)], stdin=subprocess.PIPE)
+    from playwright.sync_api import sync_playwright  # só o motor antigo usa
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(args=["--disable-web-security", "--allow-file-access-from-files", "--font-render-hinting=none"])
