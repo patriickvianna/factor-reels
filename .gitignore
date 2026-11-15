@@ -7,3 +7,5 @@ remotion/node_modules/
 remotion/public/jobs/
 remotion/public/*.wav
 out/
+voz/ptk.wav
+voz/ptk.flac

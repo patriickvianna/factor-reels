@@ -6,8 +6,8 @@ from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 torch.set_num_threads(4)
 out = Path(sys.argv[1])
 refs = {"padrao": None, "ref-dora": str(out / "ref-dora.wav")}
-for p in Path("voz").glob("ptk.*"):
-    refs["ptk"] = str(p)
+if Path("voz/ptk.wav").exists():
+    refs = {"ptk": "voz/ptk.wav", "ref-dora": refs["ref-dora"]}  # só o que falta comparar
 t0 = time.time(); m = ChatterboxMultilingualTTS.from_pretrained(device="cpu"); print(f"modelo carregado em {time.time()-t0:.0f}s")
 frases = json.load(open("voz/textos.json"))["frases"]
 for nome, ref in refs.items():

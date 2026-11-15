@@ -90,6 +90,9 @@ jobs:
       - name: Motor de animação (Remotion)
         working-directory: remotion
         run: npm ci --no-audit --no-fund && npx remotion browser ensure
+      - name: Voz do PTK (cifrada)
+        shell: bash
+        run: .github/scripts/voz-ptk.sh
       - name: Biblioteca de música
         run: |
           mkdir -p music/files
