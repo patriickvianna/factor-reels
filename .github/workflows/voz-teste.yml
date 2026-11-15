@@ -39,7 +39,12 @@ jobs:
           python -m venv /tmp/vc
           /tmp/vc/bin/pip install -q torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
           /tmp/vc/bin/pip install -q chatterbox-tts==0.1.7
-          nproc; /tmp/vc/bin/python voz/teste_chatterbox.py out 2>&1 | grep -v Warning | tee -a /tmp/voz.log
+          nproc; /tmp/vc/bin/python voz/teste_chatterbox.py out 2>&1 | grep -v -E 'Warning|Sampling' | tee -a /tmp/voz.log
+      - name: Conferir o que cada voz falou (Whisper)
+        shell: bash
+        run: |
+          /tmp/vc/bin/pip install -q faster-whisper==1.1.1 requests
+          /tmp/vc/bin/python voz/conferir.py out 2>&1 | grep -v Warning | tee -a /tmp/voz.log
       - name: Publicar amostras
         if: always()
         shell: bash

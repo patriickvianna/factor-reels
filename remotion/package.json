@@ -1,0 +1,23 @@
+{
+  "name": "factor-reels-video",
+  "private": true,
+  "type": "module",
+  "description": "Cenas animadas dos Reels da Factor Ofertas (Remotion, licença gratuita para até 3 pessoas).",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.543",
+    "@remotion/cli": "4.0.543",
+    "@remotion/fonts": "^4.0.543",
+    "@remotion/renderer": "4.0.543",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.543"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

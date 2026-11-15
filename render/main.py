@@ -27,7 +27,7 @@ sys.path.insert(0, str(HERE))
 
 import asr  # noqa: E402
 import audio  # noqa: E402
-import script as scripts  # noqa: E402
+import roteiro  # noqa: E402
 import tts  # noqa: E402
 import video  # noqa: E402
 
@@ -83,38 +83,54 @@ def remux_voice_only(video_mp4: Path, voice_wav: Path, out: Path) -> None:
        "-movflags", "+faststart", "-shortest", str(out))
 
 
+def render_remotion(props: dict, mp4: Path, cover: Path) -> None:
+    """Cenas animadas (Remotion). O bundle do projeto é reaproveitado entre os Reels da mesma rodada."""
+    pf = mp4.with_suffix(".props.json")
+    pf.write_text(json.dumps(props, ensure_ascii=False))
+    p = subprocess.run(["node", "render.mjs", str(pf), str(mp4), str(cover)], cwd=ROOT / "remotion", capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError("Remotion falhou: " + (p.stderr or p.stdout)[-900:])
+
+
 def produce(job: dict, work: Path) -> dict:
-    """Roteiro -> voz -> som -> imagem -> conferência. Devolve os arquivos e as medidas."""
+    """Roteiro -> voz -> conferência da fala -> som -> animação -> conferência. Devolve os arquivos e as medidas."""
     rid = int(job["id"])
-    s = scripts.build(job)
-    tl = tts.narrate(s, job.get("voice") or "pf_dora", work / "voice.wav")
+    voice = job.get("voice") or "pf_dora"
+    plan = roteiro.build(job)
+    tl = tts.narrate(plan, voice, work / "voice.wav")
     dur = tl["duration"]
     fala = None
     if os.environ.get("REELS_ASR", "1") == "1":
         try:
-            fala = asr.check(work / "voice.wav", s)
+            fala = asr.check(work / "voice.wav", plan)
         except Exception as e:  # a conferência da fala nunca derruba o vídeo por erro dela mesma
             fala = {"erro": str(e)[:200]}
             print("conferência da fala indisponível:", e)
     if fala and fala.get("ok") is False and os.environ.get("REELS_ASR_ENFORCE", "0") == "1":
         raise audio.QualityError(f"a voz não ficou clara (erro de {fala['wer']:.0%}): ouvi “{fala['ouvido'][:160]}”")
-    music, track = pick_music(s["mood"], rid) if job.get("with_music", True) else (None, None)
+    music, track = pick_music(plan["mood"], rid) if job.get("with_music", True) else (None, None)
     m = audio.master(work / "voice.wav", music, dur, work / "audio")
     a_final = audio.check(m["final"], dur, "som com música")
     a_voice = audio.check(m["voice_only"], dur, "som só com voz")
     mp4 = work / f"reel-{rid}.mp4"
     cover = work / f"reel-{rid}-capa.jpg"
-    info = video.render(s, tl, m["final"], mp4, cover, work / "frames")
+    final48 = work / f"reel-{rid}.wav"
+    sh("ffmpeg", "-v", "error", "-y", "-i", str(m["final"]), "-ar", "48000", "-ac", "2", str(final48))
+    props = roteiro.props(plan, tl, "")
+    props["audio_file"] = str(final48)
+    render_remotion(props, mp4, cover)
+    info = video.probe(mp4)
     video.check(info, dur)
+    a_mp4 = audio.check(mp4, dur, "som do vídeo final")
     mp4_voice = work / f"reel-{rid}-so-voz.mp4"
     remux_voice_only(mp4, m["voice_only"], mp4_voice)
     video.check(video.probe(mp4_voice), dur)
     if not cover.exists():
         raise audio.QualityError("capa não foi gerada")
-    s["timeline"] = tl
-    s["music"] = track
-    return {"script": s, "files": [mp4, mp4_voice, cover], "duration": dur,
-            "audio": {"com_musica": a_final, "so_voz": a_voice, "musica": track and track["title"], "fala": fala}, "video": info}
+    plan["timeline"] = tl
+    plan["music"] = track
+    return {"script": plan, "files": [mp4, mp4_voice, cover], "duration": dur,
+            "audio": {"com_musica": a_mp4, "so_voz": a_voice, "musica": track and track["title"], "fala": fala, "voz": voice}, "video": info}
 
 
 def publish(rid: int, attempt: int, files: list[Path], title: str) -> tuple[str, dict]:

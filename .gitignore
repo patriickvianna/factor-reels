@@ -3,3 +3,7 @@ music/files/
 out/
 render/.scene-*.html
 __pycache__/
+remotion/node_modules/
+remotion/public/jobs/
+remotion/public/*.wav
+out/
