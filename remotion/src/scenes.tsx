@@ -291,8 +291,11 @@ const Preco: React.FC<{ s: Extract<Scene, { type: "preco" }> }> = ({ s }) => {
         <RiseText text={s.nome} at={2} size={60} color={C.cream} />
         {s.de ? (
           <div style={{ position: "relative", fontSize: 60, color: C.muted, fontWeight: 500, opacity: deP }}>
-            de {s.de}
-            <span style={{ position: "absolute", left: 70, top: "52%", height: 8, width: `calc((100% - 70px) * ${strike / 100})`, background: C.orange, borderRadius: 4 }} />
+            de{" "}
+            <span style={{ position: "relative", display: "inline-block" }}>
+              {s.de}
+              <span style={{ position: "absolute", left: -4, top: "52%", height: 8, width: `${strike}%`, background: C.orange, borderRadius: 4 }} />
+            </span>
           </div>
         ) : null}
         <div style={{ fontSize: 160, fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1, color: C.white, scale: String(0.6 + 0.4 * pn), opacity: Math.min(1, pn * 2), transformOrigin: "left center" }}>

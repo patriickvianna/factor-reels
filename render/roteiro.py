@@ -137,7 +137,7 @@ def _alerta(job: dict, seed: int) -> dict:
     if badges:
         spoken = [b[1] for b in badges[:3]]
         say = "Tem " + (", ".join(spoken[:-1]) + " e " + spoken[-1] if len(spoken) > 1 else spoken[0]) + "."
-        scenes.append({"type": "prova", "imagem": o["image"], "selos": [b[0] for b in badges[:3]], "lines": [L(" · ".join(b[0] for b in badges[:3]), say)]})
+        scenes.append({"type": "prova", "imagem": o["image"], "selos": [b[0] for b in badges[:3]], "lines": [L(", ".join(b[0] for b in badges[:3]) + ".", say)]})
     scenes.append(cta(seed, oferta=o["id"]))
     badge_txt = " · ".join(b[0] for b in badges[:4])
     cap = [f"🚨 {o['title']}", "", f"De {S.money_text(orig)} por {S.money_text(price)} (-{off}%)" if off >= 5 else f"Por {S.money_text(price)}"]
