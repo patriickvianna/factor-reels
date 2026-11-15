@@ -77,7 +77,7 @@ def master(voice_wav: Path, music: Path | None, duration: float, work: Path) -> 
         graph = (
             # música: corta no tamanho, deixa uns 14 dB abaixo da voz e entra/sai suave
             f"[1:a]aresample=48000,atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,"
-            f"loudnorm=I=-28:TP=-6:LRA=11,"
+            f"loudnorm=I=-25:TP=-6:LRA=11,"
             f"afade=t=in:st=0:d=0.6,afade=t=out:st={max(0.1, duration - fade_out):.3f}:d={fade_out}[m];"
             # a voz controla a música: quando ela fala, a música abaixa mais um pouco
             "[0:a]asplit=2[vk][vm];"

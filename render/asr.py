@@ -41,7 +41,12 @@ def check(voice_wav: Path, script: dict) -> dict:
     from faster_whisper import WhisperModel
     if _model is None:
         _model = WhisperModel(os.environ.get("REELS_ASR_MODEL", "small"), device="cpu", compute_type="int8")
-    segs, _ = _model.transcribe(str(voice_wav), language="pt", beam_size=3, vad_filter=False, condition_on_previous_text=False)
+    import subprocess
+    import numpy as np
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", str(voice_wav), "-ac", "1", "-ar", "16000", "-f", "f32le", "-"],
+                         capture_output=True, check=True).stdout
+    samples = np.frombuffer(pcm, dtype=np.float32)
+    segs, _ = _model.transcribe(samples, language="pt", beam_size=3, vad_filter=False, condition_on_previous_text=False)
     heard = " ".join(s.text.strip() for s in segs)
     ref = " ".join(ln["say"] for sc in script["scenes"] for ln in sc["lines"])
     score = round(wer(_norm(ref), _norm(heard)), 3)
