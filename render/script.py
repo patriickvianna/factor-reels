@@ -107,7 +107,8 @@ def short_name(title: str, max_words: int = 4, max_chars: int = 30) -> str:
     return " ".join(out) or title[:max_chars]
 
 
-ACRONYMS = {"CPF": "cê pê efe", "TV": "tê vê", "USB": "u ésse bê", "LED": "léd", "SSD": "ésse ésse dê",
+ACRONYMS = {"GPS": "gê pê ésse", "Gps": "gê pê ésse", "NFC": "ene efe cê", "USB-C": "u ésse bê cê", "MercadoLíder": "Mercado Líder",
+            "LCD": "éle cê dê", "PC": "pê cê", "CPF": "cê pê efe", "TV": "tê vê", "USB": "u ésse bê", "LED": "léd", "SSD": "ésse ésse dê",
             "RGB": "érre gê bê", "4K": "quatro k", "HD": "agá dê", "Full": "Ful", "Wi-Fi": "uai fai", "WiFi": "uai fai"}
 
 
