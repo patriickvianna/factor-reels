@@ -89,8 +89,14 @@ def produce(job: dict, work: Path) -> dict:
     s = scripts.build(job)
     tl = tts.narrate(s, job.get("voice") or "pf_dora", work / "voice.wav")
     dur = tl["duration"]
-    fala = asr.check(work / "voice.wav", s) if os.environ.get("REELS_ASR", "1") == "1" else None
-    if fala and not fala["ok"] and os.environ.get("REELS_ASR_ENFORCE", "0") == "1":
+    fala = None
+    if os.environ.get("REELS_ASR", "1") == "1":
+        try:
+            fala = asr.check(work / "voice.wav", s)
+        except Exception as e:  # a conferência da fala nunca derruba o vídeo por erro dela mesma
+            fala = {"erro": str(e)[:200]}
+            print("conferência da fala indisponível:", e)
+    if fala and fala.get("ok") is False and os.environ.get("REELS_ASR_ENFORCE", "0") == "1":
         raise audio.QualityError(f"a voz não ficou clara (erro de {fala['wer']:.0%}): ouvi “{fala['ouvido'][:160]}”")
     music, track = pick_music(s["mood"], rid) if job.get("with_music", True) else (None, None)
     m = audio.master(work / "voice.wav", music, dur, work / "audio")
