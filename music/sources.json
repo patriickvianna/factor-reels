@@ -1,8 +1,34 @@
 {
-  "note": "Biblioteca de música dos Reels: só faixas CC0 (domínio público) do Openverse. Mudar este arquivo refaz a biblioteca.",
-  "min_seconds": 45,
-  "categories": [
-    {"mood": "urgente", "take": 5, "queries": ["upbeat electronic", "energetic electronic", "electro pop", "dance"]},
-    {"mood": "animada", "take": 6, "queries": ["happy upbeat", "fun", "cheerful", "funk", "pop"]}
-  ]
+ "note": "Biblioteca de música dos Reels: só faixas CC0 (domínio público) do Openverse. Mudar este arquivo refaz a biblioteca. skip_titles: faixas descartadas na curadoria (sem pulso, ruído ou intro).",
+ "min_seconds": 45,
+ "categories": [
+  {
+   "mood": "urgente",
+   "take": 5,
+   "queries": [
+    "upbeat electronic",
+    "energetic electronic",
+    "electro pop",
+    "dance"
+   ]
+  },
+  {
+   "mood": "animada",
+   "take": 6,
+   "queries": [
+    "happy upbeat",
+    "fun",
+    "cheerful",
+    "funk",
+    "pop"
+   ]
+  }
+ ],
+ "skip_titles": [
+  "city-loop.mp3",
+  "Ballad.wav",
+  "Synth/bass Short or Intro",
+  "Arcade Aroma",
+  "Stereo Feedback Fun"
+ ]
 }

@@ -67,6 +67,8 @@ def main() -> int:
                 if got >= cat["take"]:
                     break
                 url, title = r.get("url"), (r.get("title") or "faixa").strip()
+                if title in cfg.get("skip_titles", []):
+                    continue
                 if not url or r.get("license") not in ("cc0", "pdm") or url in seen:
                     continue
                 if (r.get("duration") or 0) and r["duration"] < cfg.get("min_seconds", 50) * 1000:
