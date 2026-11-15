@@ -46,6 +46,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       KOKORO_DIR: ${{ github.workspace }}/models
+      REELS_ASR_ENFORCE: "1"   # voz pouco clara barra o vídeo
+      REELS_MAX_WER: "0.35"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
