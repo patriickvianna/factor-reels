@@ -1,0 +1,8 @@
+{
+  "note": "Biblioteca de música dos Reels. Mudar este arquivo refaz a biblioteca (workflow Música).",
+  "min_seconds": 50,
+  "categories": [
+    {"mood": "urgente", "page": "https://freepd.com/electronic.php", "take": 5, "skip": []},
+    {"mood": "animada", "page": "https://freepd.com/upbeat.php", "take": 6, "skip": []}
+  ]
+}

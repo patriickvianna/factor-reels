@@ -1,0 +1,39 @@
+# Monta a biblioteca de música (CC0) quando music/sources.json muda.
+name: Música
+on:
+  push:
+    branches: [main]
+    paths: ["music/sources.json", "render/music_setup.py", ".github/workflows/music.yml"]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  id-token: write
+env:
+  FN_URL: https://fojvvrtctfowdhdgmske.supabase.co/functions/v1/reels-runner
+jobs:
+  musica:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Baixar e conferir as faixas
+        run: python3 render/music_setup.py 2>&1 | tee /tmp/music.log
+      - name: Guardar as faixas no Release "musica"
+        run: |
+          gh release view musica >/dev/null 2>&1 || gh release create musica --title "Biblioteca de música (CC0)" --notes "Faixas em domínio público (FreePD.com) usadas nos Reels." --latest=false
+          gh release upload musica music/files/*.mp3 --clobber
+      - name: Salvar a lista de faixas
+        run: |
+          git config user.name "factor-robo"
+          git config user.email "factor-robo@users.noreply.github.com"
+          git add music/manifest.json
+          git diff --cached --quiet || git commit -m "Biblioteca de música atualizada"
+          git push
+      - name: Registrar no painel
+        if: always()
+        run: |
+          jq -n --arg t "$(tail -c 2500 /tmp/music.log 2>/dev/null)" --argjson ok "${{ job.status == 'success' }}" '{action:"log",agent:"reels",step:"musica",ok:$ok,text:$t}' > /tmp/body.json
+          .github/scripts/api.sh "$(cat /tmp/body.json)" || true

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- Cenas dos Reels da Factor Ofertas (1080x1920).
+     Nada se mexe sozinho: cada quadro é desenhado por seek(t), então o vídeo sai igual toda vez. -->
+<style>
+@font-face { font-family: SG; src: url(fonts/space-grotesk-latin-500-normal.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: SG; src: url(fonts/space-grotesk-latin-700-normal.woff2) format("woff2"); font-weight: 700; }
+:root { --orange: #F05A1A; --orange2: #FF7A3D; --navy: #0E1C33; --navy2: #172C4D; --cream: #FFF7F1; --peach: #FFE1CC; --muted: #9FB0C8; --green: #2BB673; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--navy); }
+body { font-family: SG, system-ui, sans-serif; color: #fff; position: relative; -webkit-font-smoothing: antialiased; }
+#bg { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 0%, #1B3560 0%, var(--navy) 60%, #0A1528 100%); }
+.blob { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; }
+#b1 { width: 760px; height: 760px; background: #F05A1A; opacity: .28; }
+#b2 { width: 620px; height: 620px; background: #3D6FD1; opacity: .25; }
+#grid { position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.07) 2px, transparent 2px); background-size: 54px 54px; }
+#brand { position: absolute; left: 72px; top: 214px; display: flex; align-items: center; gap: 16px; font-weight: 700; font-size: 30px; letter-spacing: .14em; color: var(--peach); }
+#brand svg { width: 54px; height: 54px; }
+.scene { position: absolute; inset: 0; opacity: 0; will-change: transform, opacity; }
+.kicker { position: absolute; left: 72px; top: 300px; display: inline-flex; align-items: center; gap: 16px; background: var(--orange); color: #fff; font-weight: 700; font-size: 40px; letter-spacing: .06em; padding: 16px 30px; border-radius: 999px; box-shadow: 0 12px 40px rgba(240,90,26,.45); transform-origin: left center; }
+.kicker .dot { width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.card { position: absolute; background: #fff; border-radius: 48px; box-shadow: 0 40px 90px rgba(0,0,0,.45); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.card img { width: 100%; height: 100%; object-fit: contain; padding: 44px; }
+.badge { position: absolute; width: 250px; height: 250px; border-radius: 50%; background: var(--orange); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 700; box-shadow: 0 20px 60px rgba(240,90,26,.55); border: 8px solid #fff; }
+.badge b { font-size: 80px; line-height: .9; letter-spacing: -.03em; }
+.badge small { font-size: 30px; letter-spacing: .1em; margin-top: 6px; }
+.name { position: absolute; left: 72px; right: 72px; font-weight: 700; font-size: 66px; line-height: 1.08; letter-spacing: -.01em; color: var(--cream); }
+.old { position: absolute; left: 72px; font-size: 56px; font-weight: 500; color: var(--muted); }
+.old s { text-decoration: none; position: relative; }
+.old s::after { content: ""; position: absolute; left: -4px; right: var(--strike, 100%); top: 52%; height: 6px; background: var(--orange); border-radius: 3px; }
+.new { position: absolute; left: 72px; font-weight: 700; font-size: 150px; letter-spacing: -.03em; line-height: 1; color: #fff; }
+.new .rs { font-size: 70px; margin-right: 14px; color: var(--peach); }
+.new .ul { position: absolute; left: 0; bottom: -18px; height: 14px; border-radius: 7px; background: var(--orange); }
+.chips { position: absolute; left: 72px; right: 72px; display: flex; flex-direction: column; gap: 26px; }
+.chip { display: inline-flex; align-items: center; gap: 22px; align-self: flex-start; background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.18); padding: 24px 36px 24px 26px; border-radius: 28px; font-size: 54px; font-weight: 700; }
+.chip i { width: 60px; height: 60px; border-radius: 50%; background: var(--green); display: inline-flex; align-items: center; justify-content: center; font-style: normal; }
+.big { position: absolute; left: 72px; right: 72px; font-weight: 700; letter-spacing: -.02em; line-height: 1.02; }
+.pill { display: inline-block; background: var(--orange); color: #fff; font-weight: 700; border-radius: 999px; }
+.thumbs { position: absolute; left: 0; right: 0; height: 520px; }
+.thumb { position: absolute; width: 400px; height: 400px; background: #fff; border-radius: 40px; overflow: hidden; box-shadow: 0 30px 70px rgba(0,0,0,.45); }
+.thumb img { width: 100%; height: 100%; object-fit: contain; padding: 30px; }
+.num { position: absolute; left: 72px; top: 300px; display: flex; align-items: baseline; gap: 22px; font-weight: 700; }
+.num b { font-size: 170px; line-height: .8; color: var(--orange); letter-spacing: -.04em; }
+.num span { font-size: 56px; color: var(--muted); }
+.tipbody { position: absolute; left: 72px; right: 90px; font-size: 56px; line-height: 1.25; font-weight: 500; color: var(--cream); }
+.tipbody div { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 26px; }
+.tipbody div::before { content: ""; flex: 0 0 22px; height: 22px; margin-top: 22px; border-radius: 50%; background: var(--orange); }
+.tipbody.prose div::before { display: none; }
+#cap { position: absolute; left: 60px; right: 60px; top: 1400px; height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+#cap .row { font-weight: 700; font-size: 64px; line-height: 1.12; letter-spacing: -.01em; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,.55), 0 0 26px rgba(0,0,0,.55); }
+#cap .w { display: inline-block; padding: 0 8px; border-radius: 14px; }
+#cap .w.on { background: var(--orange); }
+#cap .w.done { color: #fff; }
+#cap .w.todo { color: rgba(255,255,255,.62); }
+.arrow { position: absolute; width: 120px; height: 120px; }
+</style>
+</head>
+<body>
+<div id="bg"><div class="blob" id="b1"></div><div class="blob" id="b2"></div><div id="grid"></div></div>
+<div id="brand">
+  <svg viewBox="0 0 1080 1080"><circle cx="540" cy="540" r="500" fill="#FFE1CC"/><g transform="translate(540 540) rotate(-12) translate(-320 -210)"><path d="M190 50 H560 V370 H190 L60 210 Z" fill="#F05A1A" stroke="#F05A1A" stroke-width="60" stroke-linejoin="round"/><circle cx="156" cy="210" r="30" fill="#FFE1CC"/><path d="M330 120 H470 V170 H385 V200 H455 V248 H385 V310 H330 Z" fill="#FFFFFF"/></g></svg>
+  <span>FACTOR OFERTAS</span>
+</div>
+<div id="stage"></div>
+<div id="cap"></div>
+<script>
+const D = window.DATA;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lin = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = (p) => 1 - Math.pow(1 - p, 3);
+const eBack = (p) => { const c1 = 1.55, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+const eInOut = (p) => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const h = (html) => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; };
+const priceHTML = (txt) => { const v = String(txt).replace("R$ ", ""); return `<span class="rs">R$</span>${esc(v)}`; };
+const CHECK = `<svg width="34" height="34" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ARROW = `<svg viewBox="0 0 24 24" width="120" height="120"><path d="M12 20V5M5.5 11.5L12 5l6.5 6.5" fill="none" stroke="#F05A1A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const BOOKMARK = `<svg viewBox="0 0 24 24" width="84" height="84"><path d="M6 3.5h12v17l-6-4.2-6 4.2z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>`;
+const stage = document.getElementById("stage");
+const T = D.timeline.scenes;
+const S = D.script.scenes;
+
+// tamanho de fonte que cabe na largura (para títulos longos)
+function fit(el, max, min, maxH) {
+  let s = max; el.style.fontSize = s + "px";
+  while (s > min && (el.scrollHeight > maxH)) { s -= 2; el.style.fontSize = s + "px"; }
+}
+
+const built = S.map((sc, i) => {
+  const root = h(`<div class="scene"></div>`);
+  const el = {};
+  const add = (k, html) => { el[k] = h(html); root.appendChild(el[k]); return el[k]; };
+  if (sc.type === "hook") {
+    add("kicker", `<div class="kicker"><span class="dot"></span>${esc(sc.kicker)}</div>`);
+    add("card", `<div class="card" style="left:150px;top:430px;width:780px;height:780px"><img src="${esc(sc.image)}"></div>`);
+    if (sc.off) add("badge", `<div class="badge" style="left:740px;top:340px"><b>-${sc.off}%</b><small>OFF</small></div>`);
+  } else if (sc.type === "price") {
+    add("card", `<div class="card" style="left:72px;top:400px;width:560px;height:560px"><img src="${esc(sc.image)}"></div>`);
+    if (sc.off) add("badge", `<div class="badge" style="left:680px;top:540px;width:300px;height:300px"><b style="font-size:96px">-${sc.off}%</b><small>OFF</small></div>`);
+    add("name", `<div class="name" style="top:1010px">${esc(sc.name)}</div>`);
+    if (sc.old) add("old", `<div class="old" style="top:1120px">de <s>${esc(sc.old)}</s></div>`);
+    add("new", `<div class="new" style="top:${sc.old ? 1196 : 1130}px">${priceHTML(sc.new)}<span class="ul"></span></div>`);
+  } else if (sc.type === "proof") {
+    add("card", `<div class="card" style="left:72px;top:400px;width:380px;height:380px"><img src="${esc(sc.image)}"></div>`);
+    add("title", `<div class="big" style="top:840px;font-size:78px">Compra segura</div>`);
+    const c = add("chips", `<div class="chips" style="top:980px"></div>`);
+    el.chipList = sc.badges.map((b) => { const x = h(`<div class="chip"><i>${CHECK}</i>${esc(b)}</div>`); c.appendChild(x); return x; });
+  } else if (sc.type === "cta") {
+    add("arrow", `<div class="arrow" style="left:480px;top:420px">${ARROW}</div>`);
+    add("title", `<div class="big" style="top:580px;text-align:center;font-size:140px">${sc.follow ? "SALVA<br>ESSE VÍDEO" : "LINK<br>NA BIO"}</div>`);
+    if (sc.offer) add("pill", `<div style="position:absolute;left:0;right:0;top:930px;text-align:center"><span class="pill" style="font-size:72px;padding:22px 52px">oferta #${esc(sc.offer)}</span></div>`);
+    else if (sc.offers) add("pill", `<div style="position:absolute;left:0;right:0;top:930px;text-align:center"><span class="pill" style="font-size:60px;padding:20px 44px">ofertas ${sc.offers.map((x) => "#" + esc(x)).join(" · ")}</span></div>`);
+    else add("pill", `<div style="position:absolute;left:0;right:0;top:930px;text-align:center"><span class="pill" style="font-size:60px;padding:20px 44px">siga @factorofertas</span></div>`);
+    add("sub", `<div style="position:absolute;left:0;right:0;top:1110px;display:flex;justify-content:center;align-items:center;gap:22px;font-size:46px;font-weight:500;color:var(--peach)">${BOOKMARK}<span>salve e compartilhe</span></div>`);
+  } else if (sc.type === "listhook") {
+    add("kicker", `<div class="kicker"><span class="dot"></span>${esc(sc.kicker)}</div>`);
+    const th = add("thumbs", `<div class="thumbs" style="top:430px"></div>`);
+    el.thumbList = sc.images.map((src, k) => { const x = h(`<div class="thumb"><img src="${esc(src)}"></div>`); th.appendChild(x); return x; });
+    add("title", `<div class="big" style="top:1000px;font-size:104px">${esc(sc.title)}</div>`);
+    add("sub", `<div style="position:absolute;left:72px;top:1140px"><span class="pill" style="font-size:64px;padding:16px 40px">${esc(sc.sub)}</span></div>`);
+  } else if (sc.type === "item") {
+    add("num", `<div class="num"><b>${sc.index}</b><span>/${sc.total}</span></div>`);
+    add("card", `<div class="card" style="left:250px;top:420px;width:620px;height:620px"><img src="${esc(sc.image)}"></div>`);
+    if (sc.off >= 10) add("badge", `<div class="badge" style="left:760px;top:360px;width:220px;height:220px"><b style="font-size:78px">-${sc.off}%</b><small>OFF</small></div>`);
+    add("name", `<div class="name" style="top:1080px;font-size:62px">${esc(sc.name)}</div>`);
+    add("new", `<div class="new" style="top:1170px;font-size:120px">${priceHTML(sc.new)}<span class="ul"></span></div>`);
+  } else if (sc.type === "tiphook") {
+    add("kicker", `<div class="kicker"><span class="dot"></span>${esc(sc.kicker)}</div>`);
+    add("title", `<div class="big" style="top:440px;font-size:112px;max-height:820px">${esc(sc.title)}</div>`);
+  } else if (sc.type === "tip") {
+    add("num", `<div class="num"><b>${sc.index}</b><span>${esc(sc.kicker)}</span></div>`);
+    add("title", `<div class="big" style="top:520px;font-size:92px">${esc(sc.title)}</div>`);
+    const lines = String(sc.body || "").split("\n").filter(Boolean);
+    add("body", `<div class="tipbody ${lines.length > 1 ? "" : "prose"}">${lines.map((l) => `<div><span>${esc(l)}</span></div>`).join("")}</div>`);
+    el.bodyRows = [...el.body.children];
+  }
+  stage.appendChild(root);
+  return { root, el, sc, tl: T[i] };
+});
+
+// ajustes de layout depois que o texto existe
+for (const b of built) {
+  const { el, sc } = b;
+  if (sc.type === "tiphook") fit(el.title, 112, 72, 820);
+  if (sc.type === "tip") {
+    fit(el.title, 92, 60, 300);
+    el.body.style.top = (520 + el.title.offsetHeight + 60) + "px";
+  }
+  if (sc.type === "listhook") fit(el.title, 104, 70, 130);
+  if (el.name) fit(el.name, sc.type === "item" ? 62 : 66, 44, 150);
+  if (sc.type === "item") el.new.style.top = (el.name.offsetTop + el.name.offsetHeight + 34) + "px";
+  if (sc.type === "price") {
+    let y = el.name.offsetTop + el.name.offsetHeight + 22;
+    if (el.old) { el.old.style.top = y + "px"; y += el.old.offsetHeight + 12; }
+    el.new.style.top = y + "px";
+  }
+}
+
+// legendas: cada fala vira páginas de até ~26 caracteres, com a palavra da vez em destaque
+const caps = [];
+for (const st of T) for (const ln of st.lines) {
+  const words = ln.text.replace(/R\$ /g, "R$\u00a0").split(/\s+/).filter(Boolean);
+  const weights = words.map((w) => w.replace(/[^\p{L}\p{N}]/gu, "").length + 2);
+  const total = weights.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  const timed = words.map((w, k) => { const s = ln.start + (acc / total) * (ln.end - ln.start); acc += weights[k]; return { w, s, e: ln.start + (acc / total) * (ln.end - ln.start) }; });
+  let page = [], len = 0;
+  const pages = [];
+  for (const x of timed) { if (len + x.w.length > 26 && page.length) { pages.push(page); page = []; len = 0; } page.push(x); len += x.w.length + 1; }
+  if (page.length) pages.push(page);
+  pages.forEach((p, k) => caps.push({ words: p, s: p[0].s, e: k < pages.length - 1 ? pages[k + 1][0].s : ln.end + 0.12 }));
+}
+const capEl = document.getElementById("cap");
+let capShown = -1;
+
+function drawCaption(t) {
+  const i = caps.findIndex((c) => t >= c.s - 0.02 && t < c.e);
+  if (i !== capShown) {
+    capShown = i;
+    capEl.innerHTML = i < 0 ? "" : `<div class="row">${caps[i].words.map((x) => `<span class="w">${esc(x.w)}</span>`).join(" ")}</div>`;
+  }
+  if (i < 0) return;
+  const c = caps[i];
+  const spans = capEl.querySelectorAll(".w");
+  c.words.forEach((x, k) => { spans[k].className = "w " + (t >= x.s && t < x.e ? "on" : t >= x.e ? "done" : "todo"); });
+  const p = eBack(lin(t, c.s, c.s + 0.18));
+  capEl.style.transform = `scale(${0.9 + 0.1 * p})`;
+  capEl.style.opacity = String(clamp(p * 1.4));
+}
+
+function pop(node, t, at, dur = 0.45, from = 0.6) {
+  if (!node) return 0;
+  const p = lin(t, at, at + dur);
+  const s = from + (1 - from) * eBack(p);
+  node.style.opacity = String(clamp(p * 2.2));
+  node.style.transform = (node.dataset.base || "") + ` scale(${s})`;
+  return p;
+}
+function slideUp(node, t, at, dur = 0.5, dist = 60) {
+  if (!node) return 0;
+  const p = eOut(lin(t, at, at + dur));
+  node.style.opacity = String(p);
+  node.style.transform = `translateY(${(1 - p) * dist}px)`;
+  return p;
+}
+
+function drawScene(b, t) {
+  const { root, el, sc, tl } = b;
+  const st = tl.start, en = tl.end, L = tl.lines;
+  const inP = eOut(lin(t, st, st + 0.32)), outP = eInOut(lin(t, en - 0.22, en));
+  const visible = t >= st - 0.001 && t < en + 0.001;
+  root.style.opacity = visible ? String(Math.min(inP, 1 - outP)) : "0";
+  if (!visible) return;
+  root.style.transform = `translateY(${(1 - inP) * 70 - outP * 40}px) scale(${1 - outP * 0.04})`;
+  const l0 = L[0]?.start ?? st, l1 = L[1]?.start ?? st + 0.8, l2 = L[2]?.start ?? st + 1.6;
+  const local = t - st;
+  if (sc.type === "hook") {
+    pop(el.kicker, t, st + 0.05, 0.4, 0.4);
+    const p = eOut(lin(t, st, st + 0.6));
+    el.card.style.opacity = String(p);
+    el.card.style.transform = `translateY(${(1 - p) * 120}px) scale(${0.92 + 0.08 * p + local * 0.012}) rotate(${(1 - p) * -3}deg)`;
+    if (el.badge) { el.badge.dataset.base = `rotate(${-12 + Math.sin(local * 3) * 3}deg)`; pop(el.badge, t, l1, 0.5, 0.2); }
+  } else if (sc.type === "price") {
+    const p = eOut(lin(t, st, st + 0.5));
+    el.card.style.opacity = String(p);
+    el.card.style.transform = `scale(${0.9 + 0.1 * p + local * 0.01})`;
+    slideUp(el.name, t, st + 0.1);
+    if (el.old) { slideUp(el.old, t, l0); el.old.querySelector("s").style.setProperty("--strike", `${(1 - eOut(lin(t, l0 + 0.5, l0 + 0.9))) * 100}%`); }
+    const np = pop(el.new, t, el.old ? l1 : l0, 0.5, 0.5);
+    el.new.querySelector(".ul").style.width = `${eOut(lin(t, (el.old ? l1 : l0) + 0.3, (el.old ? l1 : l0) + 0.8)) * 100}%`;
+    if (el.badge) { el.badge.dataset.base = `rotate(${-10 + Math.sin(local * 3) * 3}deg)`; pop(el.badge, t, (el.old ? l1 : l0) + 0.35, 0.5, 0.2); }
+  } else if (sc.type === "proof") {
+    const p = eOut(lin(t, st, st + 0.5));
+    el.card.style.opacity = String(p); el.card.style.transform = `scale(${0.9 + 0.1 * p})`;
+    slideUp(el.title, t, st + 0.1);
+    const span = Math.max(0.6, (L[0]?.end ?? en) - (L[0]?.start ?? st));
+    el.chipList.forEach((c, k) => slideUp(c, t, l0 + (k * span) / Math.max(1, el.chipList.length), 0.45, 80));
+  } else if (sc.type === "cta") {
+    const a = el.arrow; a.style.opacity = String(eOut(lin(t, st, st + 0.4)));
+    a.style.transform = `translateY(${Math.sin(local * 6) * 18}px)`;
+    pop(el.title, t, st + 0.05, 0.5, 0.7);
+    pop(el.pill, t, l1 - 0.05, 0.45, 0.5);
+    slideUp(el.sub, t, l2 - 0.05);
+  } else if (sc.type === "listhook") {
+    pop(el.kicker, t, st + 0.05, 0.4, 0.4);
+    const n = el.thumbList.length;
+    el.thumbList.forEach((th, k) => {
+      const p = eBack(lin(t, st + 0.1 + k * 0.18, st + 0.6 + k * 0.18));
+      const x = 340 + (k - (n - 1) / 2) * 250, rot = (k - (n - 1) / 2) * 9;
+      th.style.left = x + "px"; th.style.top = (60 + Math.abs(k - (n - 1) / 2) * 40) + "px";
+      th.style.opacity = String(clamp(p * 2));
+      th.style.transform = `translateY(${(1 - p) * 160 + Math.sin(local * 2 + k) * 8}px) rotate(${rot}deg) scale(${0.8 + 0.2 * p})`;
+      th.style.zIndex = String(k === 1 ? 3 : 1);
+    });
+    slideUp(el.title, t, l0);
+    pop(el.sub, t, l0 + 0.6, 0.45, 0.5);
+  } else if (sc.type === "item") {
+    pop(el.num, t, st + 0.02, 0.4, 0.5);
+    const p = eOut(lin(t, st, st + 0.5));
+    el.card.style.opacity = String(p); el.card.style.transform = `translateX(${(1 - p) * 200}px) scale(${0.94 + 0.06 * p + local * 0.01})`;
+    if (el.badge) { el.badge.dataset.base = `rotate(${-10 + Math.sin(local * 3) * 3}deg)`; pop(el.badge, t, l1, 0.5, 0.2); }
+    slideUp(el.name, t, l0 + 0.05);
+    pop(el.new, t, l1, 0.5, 0.5);
+    el.new.querySelector(".ul").style.width = `${eOut(lin(t, l1 + 0.3, l1 + 0.8)) * 100}%`;
+  } else if (sc.type === "tiphook") {
+    pop(el.kicker, t, st + 0.05, 0.4, 0.4);
+    slideUp(el.title, t, st + 0.15, 0.6, 90);
+  } else if (sc.type === "tip") {
+    pop(el.num, t, st + 0.02, 0.4, 0.5);
+    slideUp(el.title, t, l0);
+    const rows = el.bodyRows;
+    rows.forEach((r, k) => slideUp(r, t, rows.length > 1 ? (L[k + 1]?.start ?? l1 + k * 0.6) : l1, 0.45, 50));
+  }
+}
+
+function drawBackground(t) {
+  const b1 = document.getElementById("b1"), b2 = document.getElementById("b2");
+  b1.style.transform = `translate(${-200 + Math.sin(t * 0.35) * 160}px, ${-140 + Math.cos(t * 0.28) * 120}px)`;
+  b2.style.transform = `translate(${520 + Math.cos(t * 0.3) * 140}px, ${1250 + Math.sin(t * 0.33) * 150}px)`;
+  document.getElementById("grid").style.transform = `translateY(${-(t * 12) % 54}px)`;
+}
+
+window.seek = (t) => {
+  drawBackground(t);
+  for (const b of built) drawScene(b, t);
+  drawCaption(t);
+};
+
+window.ready = (async () => {
+  await document.fonts.ready;
+  const imgs = [...document.images];
+  const results = await Promise.all(imgs.map((im) => (im.complete && im.naturalWidth ? Promise.resolve(true) :
+    new Promise((res) => { im.onload = () => res(true); im.onerror = () => res(false); setTimeout(() => res(false), 20000); }))));
+  await Promise.all(imgs.map((im) => im.decode().catch(() => null)));
+  const bad = imgs.filter((im, k) => !results[k] || !im.naturalWidth).map((im) => im.src);
+  window.seek(0);
+  return { bad };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+models/
+music/files/
+out/
+render/.scene-*.html
+__pycache__/
