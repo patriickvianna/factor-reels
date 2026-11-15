@@ -14,12 +14,16 @@ import re
 from pathlib import Path
 
 import script as S
+import tts
 
 HANDLE = "@factor.ofertas"
 PRON = json.loads((Path(__file__).resolve().parent.parent / "voz" / "pronuncia.json").read_text(encoding="utf-8"))
 _PRON_RE = [(re.compile(rf"(?<![\wÀ-ú]){re.escape(k)}(?![\wÀ-ú])", re.I), v) for k, v in sorted(PRON["palavras"].items(), key=lambda kv: -len(kv[0]))]
 
-CONTENT_TYPES = {"gancho", "numero", "lista", "mito_verdade", "passos", "comparacao", "pergunta", "destaque"}
+CONTENT_TYPES = {"gancho", "numero", "lista", "mito_verdade", "passos", "comparacao", "pergunta", "destaque", "historia", "chat", "tela"}
+ELENCO = {"ana", "bia", "carla", "duda", "lu", "mari"}  # mesmas chaves de remotion/src/story.tsx
+EMOCOES = {"neutra", "feliz", "animada", "desconfiada", "pensativa", "brava", "furiosa", "chocada", "assustada", "triste", "cansada", "apaixonada", "aliviada"}
+LUGARES = {"casa", "loja", "rua"}
 
 
 def respell(t: str) -> str:
@@ -81,16 +85,42 @@ def _conteudo(job: dict, seed: int) -> dict:
     if isinstance(r, str):
         r = json.loads(r)
     scenes = []
+    # quem é a protagonista: fala com a voz do vídeo; a outra personagem fala com a outra voz
+    elenco = [str(x).lower() for x in (r.get("elenco") or []) if str(x).lower() in ELENCO]
+    for c in r.get("cenas", []):
+        for p in c.get("personagens") or []:
+            if str(p).lower() in ELENCO and str(p).lower() not in elenco:
+                elenco.append(str(p).lower())
+    principal = elenco[0] if elenco else None
     for c in r.get("cenas", []):
         t = c.get("tipo")
         if t == "cta":
             continue
         if t not in CONTENT_TYPES:
             raise ValueError(f"cena desconhecida: {t}")
-        fala = [x for x in (c.get("fala") or []) if str(x).strip()]
-        if not fala:
+        raw = [x for x in (c.get("fala") or []) if (x.get("texto") if isinstance(x, dict) else str(x)).strip()]
+        if not raw:
             raise ValueError(f"cena {t} sem fala")
-        sc: dict = {"type": t, "lines": [L(x) for x in fala]}
+        lines, falas = [], []
+        for x in raw:
+            if isinstance(x, dict):
+                quem = str(x.get("quem") or "").lower() or None
+                if quem and quem not in ELENCO:
+                    raise ValueError(f"personagem desconhecida: {quem}")
+                ln = L(x["texto"])
+                if quem and quem != principal:
+                    ln["voz"] = "outra"
+                lines.append(ln)
+                f = {"quem": quem}
+                if x.get("emocao") in EMOCOES:
+                    f["emocao"] = x["emocao"]
+                if x.get("reacao") in EMOCOES:
+                    f["reacao"] = x["reacao"]
+                falas.append(f)
+            else:
+                lines.append(L(x))
+                falas.append({})
+        sc: dict = {"type": t, "lines": lines}
         if t == "gancho":
             sc.update(kicker=_txt(c.get("kicker"), 24) or None, titulo=_txt(c["titulo"], 80), destaque=_txt(c.get("destaque"), 30) or None)
         elif t == "numero":
@@ -109,6 +139,32 @@ def _conteudo(job: dict, seed: int) -> dict:
             sc.update(pergunta=_txt(c["pergunta"], 80), opcoes=[_txt(x, 26) for x in c["opcoes"][:3]])
         elif t == "destaque":
             sc.update(antes=_txt(c.get("antes"), 50) or None, destaque=_txt(c["destaque"], 30), depois=_txt(c.get("depois"), 50) or None, kicker=_txt(c.get("kicker"), 24) or None)
+        elif t in ("historia", "chat"):
+            pers = [str(p).lower() for p in (c.get("personagens") or [])][:2]
+            if not pers or any(p not in ELENCO for p in pers):
+                raise ValueError(f"cena {t}: personagens devem ser do elenco {sorted(ELENCO)}")
+            # a protagonista fica sempre à esquerda (ou é "eu" na conversa)
+            if principal in pers:
+                pers.remove(principal); pers.insert(0, principal)
+            sc.update(personagens=pers, falas=falas)
+            if t == "historia":
+                if c.get("lugar") in LUGARES:
+                    sc["lugar"] = c["lugar"]
+                ini = {k.lower(): v for k, v in (c.get("inicio") or {}).items() if v in EMOCOES}
+                if ini:
+                    sc["inicio"] = ini
+                nomes = {k.lower(): _txt(v, 14) for k, v in (c.get("nomes") or r.get("nomes") or {}).items()}
+                if nomes:
+                    sc["nomes"] = nomes
+            elif c.get("contato"):
+                sc["contato"] = _txt(c["contato"], 18)
+        elif t == "tela":
+            itens = []
+            for it in (c.get("itens") or [])[:4]:
+                itens.append({"rotulo": _txt(it["rotulo"], 22), "valor": _txt(it["valor"], 14), **({"riscado": True} if it.get("riscado") else {}), **({"alerta": True} if it.get("alerta") else {})})
+            if not itens:
+                raise ValueError("cena tela sem itens")
+            sc.update(titulo=_txt(c.get("titulo") or "Carrinho", 24), itens=itens, total=_txt(c.get("total"), 14) or None, carimbo=_txt(c.get("carimbo"), 16) or None)
         scenes.append(sc)
     if not scenes or scenes[0]["type"] != "gancho":
         raise ValueError("o roteiro precisa começar com um gancho")
@@ -207,20 +263,19 @@ def caption_pages(timeline: dict, max_chars: int = 20, max_words: int = 4) -> li
     pages = []
     for sc in timeline["scenes"]:
         for ln in sc["lines"]:
-            toks: list[str] = []
-            for w in ln["text"].split():
-                if toks and toks[-1] in ("R$", "US$"):
-                    toks[-1] = f"{toks[-1]} {w}"
-                else:
-                    toks.append(w)
+            toks = tts.caption_tokens(ln["text"])
             if not toks:
                 continue
-            weights = [len(re.sub(r"[^\wÀ-ú%$]", "", t)) + 2 for t in toks]
-            total, acc, words = sum(weights), 0, []
-            for t, wgt in zip(toks, weights):
-                s = ln["start"] + acc / total * (ln["end"] - ln["start"])
-                acc += wgt
-                words.append({"text": t, "start": round(s, 3), "end": round(ln["start"] + acc / total * (ln["end"] - ln["start"]), 3)})
+            if ln.get("words") and len(ln["words"]) == len(toks):
+                # tempo real de cada palavra, ouvido pelo Whisper
+                words = [dict(w) for w in ln["words"]]
+            else:
+                weights = [len(re.sub(r"[^\wÀ-ú%$]", "", t)) + 2 for t in toks]
+                total, acc, words = sum(weights), 0, []
+                for t, wgt in zip(toks, weights):
+                    s = ln["start"] + acc / total * (ln["end"] - ln["start"])
+                    acc += wgt
+                    words.append({"text": t, "start": round(s, 3), "end": round(ln["start"] + acc / total * (ln["end"] - ln["start"]), 3)})
             # páginas equilibradas: divide a fala em n partes parecidas (nada de palavra sozinha no fim)
             full = len(" ".join(w["text"] for w in words))
             n = max(1, -(-full // max_chars), -(-len(words) // max_words))
@@ -235,8 +290,10 @@ def caption_pages(timeline: dict, max_chars: int = 20, max_words: int = 4) -> li
             if cur:
                 groups.append(cur)
             for gi, g in enumerate(groups):
-                end = groups[gi + 1][0]["start"] if gi < len(groups) - 1 else ln["end"] + 0.12
-                pages.append({"start": g[0]["start"], "end": round(end, 3), "words": g})
+                # a página aparece um instante antes da primeira palavra (o olho chega antes do ouvido)
+                start = max(ln["start"], g[0]["start"] - 0.08) if gi == 0 else g[0]["start"] - 0.04
+                end = groups[gi + 1][0]["start"] - 0.04 if gi < len(groups) - 1 else ln["end"] + 0.12
+                pages.append({"start": round(start, 3), "end": round(end, 3), "words": g})
     return pages
 
 
@@ -244,7 +301,7 @@ def props(plan: dict, timeline: dict, audio_rel: str) -> dict:
     scenes = []
     for sc, tl in zip(plan["scenes"], timeline["scenes"]):
         d = {k: v for k, v in sc.items() if k != "lines"}
-        d.update(start=tl["start"], end=tl["end"], lines=[{"text": x["text"], "start": x["start"], "end": x["end"]} for x in tl["lines"]])
+        d.update(start=tl["start"], end=tl["end"], lines=[{k: x[k] for k in ("text", "start", "end", "voz", "words") if k in x} for x in tl["lines"]])
         scenes.append(d)
     return {"scenes": scenes, "pages": caption_pages(timeline), "audio": audio_rel, "duration": timeline["duration"], "handle": HANDLE,
             "cover": round(min(1.6, timeline["duration"] / 3), 2)}

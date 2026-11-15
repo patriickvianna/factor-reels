@@ -185,5 +185,133 @@
    "legenda": "Desconto falso na Black Friday: como descobrir se a promoção é de verdade\n\nSalve o produto nos favoritos, anote o preço de hoje e compare no dia. Curte, compartilha com quem vai às compras e segue a @factor.ofertas!",
    "hashtags": "#blackfriday #descontofalso #mercadolivre #shopee #achadinhos"
   }
+ },
+ "historia": {
+  "id": 905,
+  "kind": "conteudo",
+  "voice": "cb_dora",
+  "with_music": true,
+  "offers": [],
+  "roteiro": {
+   "titulo": "A Ana quase caiu no frete grátis",
+   "formula": "História real",
+   "clima": "animada",
+   "elenco": [
+    "ana",
+    "bia"
+   ],
+   "nomes": {
+    "ana": "Ana",
+    "bia": "Bia"
+   },
+   "cenas": [
+    {
+     "tipo": "gancho",
+     "kicker": "Golpe do carrinho",
+     "titulo": "Ela achou que o frete era grátis",
+     "destaque": "grátis",
+     "fala": [
+      "A Ana achou que o frete era grátis.",
+      "Não era."
+     ]
+    },
+    {
+     "tipo": "chat",
+     "personagens": [
+      "ana",
+      "bia"
+     ],
+     "contato": "Bia",
+     "fala": [
+      {
+       "quem": "bia",
+       "texto": "Amiga, comprou o fone?"
+      },
+      {
+       "quem": "ana",
+       "texto": "Comprei! E ainda veio com frete grátis."
+      },
+      {
+       "quem": "bia",
+       "texto": "Grátis? Me manda o print do carrinho."
+      }
+     ]
+    },
+    {
+     "tipo": "tela",
+     "titulo": "Carrinho",
+     "itens": [
+      {
+       "rotulo": "Fone bluetooth",
+       "valor": "R$ 129,90"
+      },
+      {
+       "rotulo": "Frete",
+       "valor": "Grátis"
+      },
+      {
+       "rotulo": "Taxa de envio",
+       "valor": "R$ 24,90",
+       "alerta": true
+      }
+     ],
+     "total": "R$ 154,80",
+     "carimbo": "Pegadinha",
+     "fala": [
+      "Olha o carrinho dela.",
+      "O fone por R$ 129,90.",
+      "Frete grátis, até aqui tudo certo.",
+      "Mas apareceu uma taxa de envio de R$ 24,90."
+     ]
+    },
+    {
+     "tipo": "historia",
+     "personagens": [
+      "ana",
+      "bia"
+     ],
+     "lugar": "casa",
+     "fala": [
+      {
+       "quem": "ana",
+       "texto": "Peraí, eu paguei frete sem saber?",
+       "emocao": "chocada"
+      },
+      {
+       "quem": "bia",
+       "texto": "Pagou. Mudaram o nome, mas a cobrança continua.",
+       "emocao": "desconfiada"
+      },
+      {
+       "quem": "ana",
+       "texto": "E como eu fujo disso?",
+       "emocao": "brava"
+      },
+      {
+       "quem": "bia",
+       "texto": "Antes de pagar, olha sempre o total, não o frete.",
+       "emocao": "feliz",
+       "reacao": "aliviada"
+      }
+     ]
+    },
+    {
+     "tipo": "passos",
+     "titulo": "Antes de pagar",
+     "passos": [
+      "Confira o total final",
+      "Procure taxa de envio",
+      "Compare com outra loja"
+     ],
+     "fala": [
+      "Então, antes de pagar: confira o total final.",
+      "Procure taxa de envio escondida.",
+      "E compare com outra loja."
+     ]
+    }
+   ],
+   "legenda": "A Ana achou que o frete era grátis... 👀 Salva pra não cair nessa!",
+   "hashtags": "#fretegratis #comprasonline #achadinhos"
+  }
  }
 }

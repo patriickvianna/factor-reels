@@ -3,6 +3,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { Confetti } from "./remocn/confetti";
+import { Chat, Historia, Tela } from "./story";
 import { C, SAFE, SAFE_W } from "./theme";
 import type { Scene } from "./types";
 
@@ -415,6 +416,9 @@ export const SceneView: React.FC<{ scene: Scene }> = ({ scene }) => {
     case "prova": return <Prova s={scene} />;
     case "produtos": return <Produtos s={scene} />;
     case "item": return <Item s={scene} />;
+    case "historia": return <Historia s={scene} />;
+    case "chat": return <Chat s={scene} />;
+    case "tela": return <Tela s={scene} />;
     case "cta": return <Cta s={scene} />;
     default: return <AbsoluteFill />;
   }

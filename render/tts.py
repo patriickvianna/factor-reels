@@ -31,6 +31,7 @@ SPEED = {"pf_dora": 1.06, "pm_alex": 1.06, "pm_santa": 1.04}
 CB_REF = {"cb_ptk": ROOT / "voz" / "ptk.wav", "cb_dora": ROOT / "voz" / "ref-dora.wav", "cb_padrao": None}
 
 _cb = None
+_LAST_HEARD: list = []
 
 
 def _trim(x: np.ndarray, thr_db: float = -45.0, pad: float = 0.03) -> np.ndarray:
@@ -99,7 +100,17 @@ def _ok_length(audio: np.ndarray, text: str) -> bool:
     return 0.035 * n <= dur <= 0.16 * n + 1.2
 
 
-def synth_all(texts: list[str], voice: str) -> list[np.ndarray]:
+def synth_all(texts: list[str], voice: str | list[str]) -> list[np.ndarray]:
+    """Gera cada fala. `voice` pode ser uma voz só ou uma lista (uma voz por fala, para diálogos)."""
+    voices = voice if isinstance(voice, list) else [voice] * len(texts)
+    if len(set(voices)) > 1:
+        out: list = [None] * len(texts)
+        for v in dict.fromkeys(voices):
+            idx = [i for i, x in enumerate(voices) if x == v]
+            for i, a in zip(idx, synth_all([texts[i] for i in idx], v)):
+                out[i] = a
+        return out
+    voice = voices[0] if voices else "cb_dora"
     if os.environ.get("TTS_ENGINE") == "espeak":
         raw = [_espeak(t) for t in texts]
     elif voice.startswith("cb_"):
@@ -107,22 +118,23 @@ def synth_all(texts: list[str], voice: str) -> list[np.ndarray]:
         raw = []
         for t in texts:
             # até 3 tentativas: fica a que a conferência (Whisper) ouviu mais certo
-            best, best_w = None, 9.0
+            best, best_w, best_heard = None, 9.0, None
             for tries in range(3):
                 a = _trim(_chatterbox(t, voice, tries))
                 if not _ok_length(a, t):
                     continue
                 try:
-                    w = asr.line_wer(a, t)
+                    w, heard = asr.hear_line(a, t)
                 except Exception:
-                    w = 0.0
+                    w, heard = 0.0, None
                 if w < best_w:
-                    best, best_w = a, w
+                    best, best_w, best_heard = a, w, heard
                 if w <= 0.25:
                     break
             if best is None:
                 raise RuntimeError(f"a voz cortou a fala: {t!r}")
             raw.append(best)
+            _LAST_HEARD.append(best_heard)
     else:
         import roteiro
         raw = _kokoro_batch([roteiro.respell(t) for t in texts], voice)
@@ -135,10 +147,33 @@ def synth_all(texts: list[str], voice: str) -> list[np.ndarray]:
     return out
 
 
+def _heard_words(audio: np.ndarray, text: str):
+    """Palavras ouvidas pelo Whisper com o instante de cada uma (None se a conferência estiver desligada)."""
+    if os.environ.get("REELS_ASR") == "0":
+        return None
+    try:
+        import asr
+        return asr.hear_line(audio, text)[1]
+    except Exception as e:
+        print(f"  aviso: tempo das palavras indisponível ({e})")
+        return None
+
+
 def narrate(script: dict, voice: str, out_wav: Path, lead_in: float = 0.25, tail: float = 0.7) -> dict:
-    """Gera a narração inteira e devolve os tempos de cada cena e de cada fala (em segundos)."""
-    flat = [ln["say"] for sc in script["scenes"] for ln in sc["lines"]]
-    audios = iter(synth_all(flat, voice))
+    """Gera a narração inteira e devolve os tempos de cada cena, de cada fala e de cada palavra (em segundos).
+
+    Numa história, a fala pode trazer "voz": "outra" para o segundo personagem falar com a outra voz."""
+    import asr
+    other = {"cb_dora": "cb_padrao", "cb_padrao": "cb_dora", "pf_dora": "pm_alex", "pm_alex": "pf_dora"}.get(voice, voice)
+    flat = [ln for sc in script["scenes"] for ln in sc["lines"]]
+    voices = [other if ln.get("voz") == "outra" else voice for ln in flat]
+    _LAST_HEARD.clear()
+    audios_l = synth_all([ln["say"] for ln in flat], voices if len(set(voices)) > 1 else voice)
+    # o Chatterbox já foi ouvido ao escolher a melhor tentativa; as outras vozes são ouvidas agora
+    heard_cache = {}
+    if len(_LAST_HEARD) == len(flat) and not any(v != voice for v in voices):
+        heard_cache = dict(enumerate(_LAST_HEARD))
+    audios = iter(enumerate(audios_l))
     chunks: list[np.ndarray] = [np.zeros(int(lead_in * SR), dtype="float32")]
     t = lead_in
     timeline = []
@@ -146,9 +181,17 @@ def narrate(script: dict, voice: str, out_wav: Path, lead_in: float = 0.25, tail
         s_start = t if si else 0.0
         lines = []
         for li, ln in enumerate(scene["lines"]):
-            a = next(audios)
+            k, a = next(audios)
             dur = a.size / SR
-            lines.append({"text": ln["text"], "start": round(t, 3), "end": round(t + dur, 3)})
+            heard = heard_cache.get(k) if k in heard_cache else _heard_words(a, ln["say"])
+            line = {"text": ln["text"], "start": round(t, 3), "end": round(t + dur, 3)}
+            if ln.get("voz"):
+                line["voz"] = ln["voz"]
+            if heard:
+                toks = caption_tokens(ln["text"])
+                line["words"] = [{"text": w["text"], "start": round(t + w["start"], 3), "end": round(t + w["end"], 3)}
+                                 for w in asr.align(toks, heard, dur)]
+            lines.append(line)
             chunks.append(a)
             t += dur
             gap = GAP_LINE if li < len(scene["lines"]) - 1 else (GAP_SCENE if si < len(script["scenes"]) - 1 else tail)
@@ -158,3 +201,14 @@ def narrate(script: dict, voice: str, out_wav: Path, lead_in: float = 0.25, tail
     audio = np.concatenate(chunks)
     sf.write(out_wav, audio, SR, subtype="PCM_16")
     return {"scenes": timeline, "duration": round(audio.size / SR, 3)}
+
+
+def caption_tokens(text: str) -> list[str]:
+    """Palavras da legenda, com "R$" colado no valor."""
+    toks: list[str] = []
+    for w in text.split():
+        if toks and toks[-1] in ("R$", "US$"):
+            toks[-1] = f"{toks[-1]} {w}"
+        else:
+            toks.append(w)
+    return toks

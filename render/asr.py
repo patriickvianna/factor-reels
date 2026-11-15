@@ -61,12 +61,75 @@ def _get_model():
     return _model
 
 
-def line_wer(audio_24k, text: str) -> float:
-    """Erro de uma fala só (usado para gerar de novo a frase que a voz embolou)."""
+def _to16k(audio_24k):
     import numpy as np
     a = np.asarray(audio_24k, dtype=np.float32)
     idx = np.round(np.arange(0, a.size, 24000 / 16000)).astype(int)
-    a16 = a[idx[idx < a.size]]
-    segs, _ = _get_model().transcribe(a16, language="pt", beam_size=3, vad_filter=False, condition_on_previous_text=False)
-    heard = " ".join(x.text.strip() for x in segs)
-    return wer(_norm(text), _norm(heard))
+    return a[idx[idx < a.size]]
+
+
+def hear_line(audio_24k, text: str) -> tuple[float, list[dict]]:
+    """Ouve uma fala só: devolve o erro (para gerar de novo a frase embolada) e o instante de cada palavra ouvida."""
+    segs, _ = _get_model().transcribe(_to16k(audio_24k), language="pt", beam_size=3, vad_filter=False,
+                                      condition_on_previous_text=False, word_timestamps=True)
+    words = [{"w": w.word.strip(), "start": float(w.start), "end": float(w.end)} for s in segs for w in (s.words or [])]
+    heard = " ".join(w["w"] for w in words)
+    return wer(_norm(text), _norm(heard)), words
+
+
+def line_wer(audio_24k, text: str) -> float:
+    return hear_line(audio_24k, text)[0]
+
+
+def align(tokens: list[str], heard: list[dict], dur: float) -> list[dict]:
+    """Dá a cada palavra da legenda o tempo em que ela foi dita.
+
+    A legenda e a fala nem sempre têm as mesmas palavras ("R$ 169" vira "cento e sessenta e nove reais"),
+    então as duas viram a forma falada e são casadas palavra a palavra. O que não casar é distribuído
+    entre os vizinhos pelo tamanho."""
+    import difflib
+    ref, owner = [], []
+    for i, t in enumerate(tokens):
+        for w in _norm(t):
+            ref.append(w); owner.append(i)
+    hyp, hyp_t = [], []
+    for h in heard:
+        for w in _norm(h["w"]):
+            hyp.append(w); hyp_t.append((h["start"], h["end"]))
+    st: list = [None] * len(tokens)
+    en: list = [None] * len(tokens)
+    sm = difflib.SequenceMatcher(a=ref, b=hyp, autojunk=False)
+    for blk in sm.get_matching_blocks():
+        for k in range(blk.size):
+            i, (s0, e0) = owner[blk.a + k], hyp_t[blk.b + k]
+            st[i] = s0 if st[i] is None else min(st[i], s0)
+            en[i] = e0 if en[i] is None else max(en[i], e0)
+    # mantém a ordem (tempo nunca volta) e preenche os buracos
+    last = 0.0
+    for i in range(len(tokens)):
+        if st[i] is not None and st[i] < last:
+            st[i] = en[i] = None
+        elif st[i] is not None:
+            last = st[i]
+    weight = [max(1, len(re.sub(r"[^\wÀ-ú%$]", "", t))) + 2 for t in tokens]
+    i = 0
+    while i < len(tokens):
+        if st[i] is not None:
+            i += 1
+            continue
+        j = i
+        while j < len(tokens) and st[j] is None:
+            j += 1
+        a = en[i - 1] if i > 0 else 0.0
+        b = st[j] if j < len(tokens) else dur
+        if b < a:
+            b = a
+        tot = sum(weight[i:j]); acc = 0
+        for k in range(i, j):
+            st[k] = a + acc / tot * (b - a); acc += weight[k]; en[k] = a + acc / tot * (b - a)
+        i = j
+    out = []
+    for i, t in enumerate(tokens):
+        s0 = max(0.0, min(st[i], dur)); e0 = max(s0 + 0.05, min(en[i], dur))
+        out.append({"text": t, "start": round(s0, 3), "end": round(e0, 3)})
+    return out

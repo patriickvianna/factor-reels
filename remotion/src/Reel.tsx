@@ -2,6 +2,7 @@
 import React from "react";
 import { AbsoluteFill, Audio, Easing, interpolate, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { SceneView } from "./scenes";
+import { OWN_CAPTION } from "./story";
 import { C, FONT, loadBrandFonts, SAFE, SAFE_W } from "./theme";
 import type { CaptionPage, ReelProps, Scene } from "./types";
 
@@ -28,10 +29,12 @@ const Brand: React.FC = () => (
 );
 
 /** Legenda: uma linha por vez, palavra da vez em destaque; preço e "R$" nunca se separam. */
-const Captions: React.FC<{ pages: CaptionPage[] }> = ({ pages }) => {
+const Captions: React.FC<{ pages: CaptionPage[]; scenes: Scene[] }> = ({ pages, scenes }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
+  const sc = scenes.find((x) => t >= x.start && t < x.end);
+  if (sc && OWN_CAPTION.has(sc.type)) return null; // o balão já é a legenda
   const page = pages.find((p) => t >= p.start - 0.02 && t < p.end);
   if (!page) return null;
   const pop = interpolate(t, [page.start, page.start + 0.16], [0, 1], { ...clamp, easing: Easing.bezier(0.34, 1.56, 0.64, 1) });
@@ -41,8 +44,9 @@ const Captions: React.FC<{ pages: CaptionPage[] }> = ({ pages }) => {
         {page.words.map((w, i) => {
           const on = t >= w.start && t < w.end;
           const done = t >= w.end;
+          const hit = interpolate(t, [w.start, w.start + 0.06, w.start + 0.18], [1, 1.12, 1], clamp);
           return (
-            <span key={i} style={{ display: "inline-block", padding: "0 10px", margin: "0 2px", borderRadius: 14, background: on ? C.orange : "transparent", color: on || done ? C.white : "rgba(255,255,255,.62)" }}>
+            <span key={i} style={{ display: "inline-block", padding: "0 10px", margin: "0 2px", borderRadius: 14, background: on ? C.orange : "transparent", color: on || done ? C.white : "rgba(255,255,255,.62)", scale: on ? String(hit) : undefined }}>
               {w.text}
             </span>
           );
@@ -52,14 +56,30 @@ const Captions: React.FC<{ pages: CaptionPage[] }> = ({ pages }) => {
   );
 };
 
-const SceneShell: React.FC<{ scene: Scene; last: boolean }> = ({ scene, last }) => {
+// Transições alternadas (subir, zoom, chicote lateral) e um "tranco" de câmera a cada fala nova.
+const SceneShell: React.FC<{ scene: Scene; index: number; last: boolean }> = ({ scene, index, last }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const dur = Math.round((scene.end - scene.start) * fps);
-  const inP = interpolate(frame, [0, 9], [0, 1], { ...clamp, easing: Easing.bezier(0.16, 1, 0.3, 1) });
+  const inP = interpolate(frame, [0, 10], [0, 1], { ...clamp, easing: Easing.bezier(0.16, 1, 0.3, 1) });
   const outP = last ? 0 : interpolate(frame, [dur - 7, dur], [0, 1], { ...clamp, easing: Easing.in(Easing.cubic) });
+  const kind = index === 0 ? 1 : index % 3;
+  let translate = `0 ${(1 - inP) * 70 - outP * 40}px`;
+  let scale = 1 - outP * 0.04;
+  let blur = 0;
+  if (kind === 1) { translate = "0 0"; scale = 1.18 - 0.18 * inP + outP * 0.12; }
+  if (kind === 2) { translate = `${(1 - inP) * 380 - outP * 380}px 0`; blur = (1 - inP) * 14 + outP * 14; }
+  // tranco de câmera quando começa uma fala (menos nas histórias, que têm câmera própria)
+  let kick = 0;
+  if (scene.type !== "historia") {
+    for (const ln of scene.lines) {
+      const at = Math.round((ln.start - scene.start) * fps);
+      if (frame >= at && at > 2) kick = 0.022 * Math.exp(-(frame - at) / 5);
+    }
+  }
+  const drift = scene.type === "historia" ? 1 : 1 + frame * 0.00025;
   return (
-    <AbsoluteFill style={{ opacity: Math.min(inP, 1 - outP), translate: `0 ${(1 - inP) * 60 - outP * 40}px`, scale: String(1 - outP * 0.04) }}>
+    <AbsoluteFill style={{ opacity: Math.min(inP * 1.4, 1 - outP), translate, scale: String(scale * drift + kick), filter: blur > 0.3 ? `blur(${blur}px)` : undefined }}>
       <SceneView scene={scene} />
     </AbsoluteFill>
   );
@@ -76,11 +96,11 @@ export const Reel: React.FC<ReelProps> = ({ scenes, pages, audio }) => {
         const to = Math.round(s.end * fps);
         return (
           <Sequence key={i} from={from} durationInFrames={Math.max(1, to - from)} layout="none">
-            <SceneShell scene={s} last={i === scenes.length - 1} />
+            <SceneShell scene={s} index={i} last={i === scenes.length - 1} />
           </Sequence>
         );
       })}
-      <Captions pages={pages} />
+      <Captions pages={pages} scenes={scenes} />
       {audio ? <Audio src={staticFile(audio)} /> : null}
     </AbsoluteFill>
   );
