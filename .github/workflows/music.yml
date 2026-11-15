@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
       - name: Baixar e conferir as faixas
+        shell: bash
         run: python3 render/music_setup.py 2>&1 | tee /tmp/music.log
       - name: Guardar as faixas no Release "musica"
         run: |

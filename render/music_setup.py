@@ -38,8 +38,18 @@ def main() -> int:
     cfg = json.loads((ROOT / "music" / "sources.json").read_text())
     OUT.mkdir(parents=True, exist_ok=True)
     manifest = []
+    home = cfg.get("home", "https://freepd.com/")
+    home_html = get(home).decode("utf-8", "ignore")
+    pages = sorted({urllib.parse.urljoin(home, h) for h in re.findall(r"""href=["']([^"'#?]+)["']""", home_html)
+                    if urllib.parse.urljoin(home, h).startswith(home) and not h.lower().endswith(".mp3")})
+    print("páginas no site:", ", ".join(x.replace(home, "/") for x in pages)[:1500])
     for cat in cfg["categories"]:
-        html = get(cat["page"]).decode("utf-8", "ignore")
+        page = next((x for x in pages if cat["keyword"] in x.rsplit("/", 1)[-1].lower()), None)
+        if not page:
+            print(cat["mood"], ": nenhuma página com", cat["keyword"])
+            continue
+        cat["page"] = page
+        html = get(page).decode("utf-8", "ignore")
         links = []
         for m in re.findall(r"""(?:href|src)=["']([^"']+\.mp3)["']""", html, re.I):
             u = urllib.parse.urljoin(cat["page"], m)
