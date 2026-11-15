@@ -1,0 +1,9 @@
+{
+  "frases": [
+    {"id": "gancho", "texto": "Para tudo! Esse é o truque que ninguém te conta sobre a Black Friday."},
+    {"id": "dica", "texto": "Salva o produto nos favoritos, anota o preço de hoje e compara no dia da promoção. Se o preço subiu antes, o desconto é maquiagem."},
+    {"id": "ingles", "texto": "A air fryer e o smartwatch da Shopee caíram trinta e cinco por cento no Mercado Livre."},
+    {"id": "ingles_respelado", "texto": "A ér fráier e o ismartuótch da Xópi caíram trinta e cinco por cento no Mercado Livre. Bléqui Fráidei!"},
+    {"id": "cta", "texto": "Curte esse vídeo e segue a Factor Ofertas pra não perder nenhuma promoção!"}
+  ]
+}
