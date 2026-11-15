@@ -66,8 +66,8 @@ def build(job: dict) -> dict:
 
 def _txt(v, n: int) -> str:
     s = re.sub(r"\s+", " ", str(v or "")).strip()
-    if len(s) > n:
-        raise ValueError(f"texto longo demais para a tela ({len(s)} > {n}): {s[:60]}")
+    if len(s) > n:  # texto de tela longo demais: corta na última palavra inteira (a fala continua completa)
+        s = s[: n + 1].rsplit(" ", 1)[0].rstrip(",;:")
     return s
 
 
