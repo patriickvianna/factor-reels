@@ -1,9 +1,8 @@
 {
-  "note": "Biblioteca de música dos Reels. Mudar este arquivo refaz a biblioteca (workflow Música).",
-  "home": "https://freepd.com/",
-  "min_seconds": 50,
+  "note": "Biblioteca de música dos Reels: só faixas CC0 (domínio público) do Openverse. Mudar este arquivo refaz a biblioteca.",
+  "min_seconds": 45,
   "categories": [
-    {"mood": "urgente", "keyword": "electronic", "take": 5, "skip": []},
-    {"mood": "animada", "keyword": "upbeat", "take": 6, "skip": []}
+    {"mood": "urgente", "take": 5, "queries": ["upbeat electronic", "energetic electronic", "electro pop", "dance"]},
+    {"mood": "animada", "take": 6, "queries": ["happy upbeat", "fun", "cheerful", "funk", "pop"]}
   ]
 }

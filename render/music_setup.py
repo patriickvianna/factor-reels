@@ -1,9 +1,9 @@
-"""Monta a biblioteca de música dos Reels (roda uma vez no GitHub Actions, quando music/sources.json muda).
+"""Monta a biblioteca de música dos Reels (roda no GitHub Actions quando music/sources.json muda).
 
-Fonte: FreePD.com, músicas em domínio público (CC0 1.0): uso comercial liberado, sem crédito obrigatório.
-Para cada categoria, baixa as primeiras faixas que passam no filtro (duração e volume), etiqueta com o clima
-e guarda os MP3 como anexos do Release "musica" deste repositório (fora do git, para o repositório não crescer).
-O arquivo music/manifest.json lista o que existe; o robô escolhe a faixa pelo clima de cada formato.
+Busca no Openverse (catálogo aberto de mídia) só faixas de MÚSICA com licença CC0 (domínio público):
+uso comercial liberado e sem crédito obrigatório. Cada faixa passa por filtro de duração e volume,
+recebe a etiqueta de clima (urgente / animada) e vai para o Release "musica" deste repositório
+(fora do git, para o repositório não crescer). O arquivo music/manifest.json lista o que existe.
 """
 from __future__ import annotations
 
@@ -17,11 +17,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "music" / "files"
-UA = {"User-Agent": "Mozilla/5.0 (factor-reels music setup)"}
+UA = {"User-Agent": "factor-reels/1.0 (github.com/patriickvianna/factor-reels)"}
+API = "https://api.openverse.org/v1/audio/"
 
 
 def get(url: str) -> bytes:
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=90) as r:
         return r.read()
 
 
@@ -34,53 +35,61 @@ def probe(path: Path) -> tuple[float, float]:
     return d, i
 
 
+def search(q: str, n: int) -> list[dict]:
+    params = {"q": q, "license": "cc0", "category": "music", "page_size": str(n), "mature": "false", "length": "medium,long"}
+    data = json.loads(get(API + "?" + urllib.parse.urlencode(params)))
+    return data.get("results", [])
+
+
 def main() -> int:
     cfg = json.loads((ROOT / "music" / "sources.json").read_text())
     OUT.mkdir(parents=True, exist_ok=True)
-    manifest = []
-    home = cfg.get("home", "https://freepd.com/")
-    home_html = get(home).decode("utf-8", "ignore")
-    pages = sorted({urllib.parse.urljoin(home, h) for h in re.findall(r"""href=["']([^"'#?]+)["']""", home_html)
-                    if urllib.parse.urljoin(home, h).startswith(home) and not h.lower().endswith(".mp3")})
-    print("páginas no site:", ", ".join(x.replace(home, "/") for x in pages)[:1500])
+    manifest, seen = [], set()
     for cat in cfg["categories"]:
-        page = next((x for x in pages if cat["keyword"] in x.rsplit("/", 1)[-1].lower()), None)
-        if not page:
-            print(cat["mood"], ": nenhuma página com", cat["keyword"])
-            continue
-        cat["page"] = page
-        html = get(page).decode("utf-8", "ignore")
-        links = []
-        for m in re.findall(r"""(?:href|src)=["']([^"']+\.mp3)["']""", html, re.I):
-            u = urllib.parse.urljoin(cat["page"], m)
-            if u not in links:
-                links.append(u)
-        print(cat["mood"], "->", len(links), "faixas na página")
-        skip = {s.lower() for s in cat.get("skip", [])}
         got = 0
-        for u in links:
+        for q in cat["queries"]:
             if got >= cat["take"]:
                 break
-            title = urllib.parse.unquote(u.rsplit("/", 1)[-1])[:-4]
-            if title.lower() in skip:
-                continue
-            fname = f"{cat['mood']}-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')}.mp3"
-            dst = OUT / fname
             try:
-                dst.write_bytes(get(u))
-                dur, lufs = probe(dst)
-            except Exception as e:  # faixa quebrada: pula
-                print("  pulei", title, e)
-                dst.unlink(missing_ok=True)
+                results = search(q, 20)
+            except Exception as e:
+                print(f"busca '{q}' falhou: {e}")
                 continue
-            if dur < cfg.get("min_seconds", 50) or lufs < -32:
-                print(f"  pulei {title}: {dur:.0f}s, {lufs} LUFS")
-                dst.unlink(missing_ok=True)
-                continue
-            manifest.append({"file": fname, "title": title, "mood": cat["mood"], "duration": round(dur, 1), "lufs": lufs,
-                             "source": u, "license": "CC0 1.0 (FreePD.com)"})
-            got += 1
-            print(f"  ok {title}: {dur:.0f}s, {lufs} LUFS")
+            print(f"{cat['mood']} · '{q}': {len(results)} resultados")
+            for r in results:
+                if got >= cat["take"]:
+                    break
+                url, title = r.get("url"), (r.get("title") or "faixa").strip()
+                if not url or r.get("license") != "cc0" or url in seen:
+                    continue
+                if (r.get("duration") or 0) and r["duration"] < cfg.get("min_seconds", 50) * 1000:
+                    continue
+                seen.add(url)
+                ext = Path(urllib.parse.urlparse(url).path).suffix.lower() or ".mp3"
+                slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40] or "faixa"
+                raw = OUT / f"tmp{ext}"
+                fname = f"{cat['mood']}-{slug}.mp3"
+                dst = OUT / fname
+                try:
+                    raw.write_bytes(get(url))
+                    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-ac", "2", "-ar", "48000",
+                                    "-b:a", "192k", str(dst)], check=True)
+                    raw.unlink(missing_ok=True)
+                    dur, lufs = probe(dst)
+                except Exception as e:
+                    print("  pulei", title, e)
+                    raw.unlink(missing_ok=True)
+                    dst.unlink(missing_ok=True)
+                    continue
+                if dur < cfg.get("min_seconds", 50) or lufs < -30:
+                    print(f"  pulei {title}: {dur:.0f}s, {lufs} LUFS")
+                    dst.unlink(missing_ok=True)
+                    continue
+                manifest.append({"file": fname, "title": title, "mood": cat["mood"], "duration": round(dur, 1), "lufs": lufs,
+                                 "creator": r.get("creator"), "source": r.get("foreign_landing_url") or url, "provider": r.get("source"),
+                                 "license": "CC0 1.0"})
+                got += 1
+                print(f"  ok {title} ({r.get('source')}): {dur:.0f}s, {lufs} LUFS")
     if len(manifest) < 4:
         print("poucas faixas encontradas; biblioteca não foi trocada")
         return 1
