@@ -25,6 +25,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 
+import asr  # noqa: E402
 import audio  # noqa: E402
 import script as scripts  # noqa: E402
 import tts  # noqa: E402
@@ -88,6 +89,9 @@ def produce(job: dict, work: Path) -> dict:
     s = scripts.build(job)
     tl = tts.narrate(s, job.get("voice") or "pf_dora", work / "voice.wav")
     dur = tl["duration"]
+    fala = asr.check(work / "voice.wav", s) if os.environ.get("REELS_ASR", "1") == "1" else None
+    if fala and not fala["ok"] and os.environ.get("REELS_ASR_ENFORCE", "0") == "1":
+        raise audio.QualityError(f"a voz não ficou clara (erro de {fala['wer']:.0%}): ouvi “{fala['ouvido'][:160]}”")
     music, track = pick_music(s["mood"], rid) if job.get("with_music", True) else (None, None)
     m = audio.master(work / "voice.wav", music, dur, work / "audio")
     a_final = audio.check(m["final"], dur, "som com música")
@@ -104,13 +108,21 @@ def produce(job: dict, work: Path) -> dict:
     s["timeline"] = tl
     s["music"] = track
     return {"script": s, "files": [mp4, mp4_voice, cover], "duration": dur,
-            "audio": {"com_musica": a_final, "so_voz": a_voice, "musica": track and track["title"]}, "video": info}
+            "audio": {"com_musica": a_final, "so_voz": a_voice, "musica": track and track["title"], "fala": fala}, "video": info}
 
 
 def publish(rid: int, attempt: int, files: list[Path], title: str) -> tuple[str, dict]:
     tag = f"reel-{rid}-{attempt}-{int(time.time())}"
     sh("gh", "release", "create", tag, *map(str, files), "--repo", REPO, "--title", f"Reels #{rid}: {title}"[:120],
        "--notes", "Gerado pelo robô da Factor Ofertas. Apagado automaticamente 14 dias depois.", "--latest=false")
+    # Refazer: apaga a versão anterior deste mesmo Reels (não deixa vídeo velho ocupando espaço)
+    try:
+        old = [ln.split("\t")[2] for ln in sh("gh", "release", "list", "--repo", REPO, "--limit", "200").splitlines() if "\t" in ln]
+        for t in old:
+            if t.startswith(f"reel-{rid}-") and t != tag:
+                sh("gh", "release", "delete", t, "--repo", REPO, "--yes", "--cleanup-tag")
+    except RuntimeError as e:
+        print("não consegui apagar a versão anterior:", e)
     base = f"https://github.com/{REPO}/releases/download/{tag}/"
     return tag, {"video_url": base + files[0].name, "voice_url": base + files[1].name, "cover_url": base + files[2].name}
 
@@ -133,7 +145,7 @@ def cleanup() -> None:
 
 def run_queue() -> int:
     cleanup()
-    jobs = api("claim", limit=int(os.environ.get("REELS_LIMIT", "2"))).get("jobs") or []
+    jobs = api("claim", limit=int(os.environ.get("REELS_LIMIT", "3"))).get("jobs") or []
     print(f"{len(jobs)} Reels na vez")
     failures = 0
     for job in jobs:
