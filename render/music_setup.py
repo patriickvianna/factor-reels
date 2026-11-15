@@ -36,9 +36,16 @@ def probe(path: Path) -> tuple[float, float]:
 
 
 def search(q: str, n: int) -> list[dict]:
-    params = {"q": q, "license": "cc0", "category": "music", "page_size": str(n), "mature": "false", "length": "medium,long"}
-    data = json.loads(get(API + "?" + urllib.parse.urlencode(params)))
-    return data.get("results", [])
+    """Tenta do filtro mais estrito ao mais solto; sempre só domínio público (cc0 ou pdm)."""
+    for extra in ({"category": "music"}, {}):
+        params = {"q": q, "license": "cc0,pdm", "page_size": str(n), **extra}
+        raw = get(API + "?" + urllib.parse.urlencode(params))
+        data = json.loads(raw)
+        res = data.get("results", [])
+        print(f"   openverse {params} -> {data.get('result_count')} ({len(res)})" + ("" if res else f" {raw[:160]!r}"))
+        if res:
+            return res
+    return []
 
 
 def main() -> int:
@@ -60,7 +67,7 @@ def main() -> int:
                 if got >= cat["take"]:
                     break
                 url, title = r.get("url"), (r.get("title") or "faixa").strip()
-                if not url or r.get("license") != "cc0" or url in seen:
+                if not url or r.get("license") not in ("cc0", "pdm") or url in seen:
                     continue
                 if (r.get("duration") or 0) and r["duration"] < cfg.get("min_seconds", 50) * 1000:
                     continue
@@ -87,7 +94,7 @@ def main() -> int:
                     continue
                 manifest.append({"file": fname, "title": title, "mood": cat["mood"], "duration": round(dur, 1), "lufs": lufs,
                                  "creator": r.get("creator"), "source": r.get("foreign_landing_url") or url, "provider": r.get("source"),
-                                 "license": "CC0 1.0"})
+                                 "license": "domínio público (" + str(r.get("license")).upper() + ")"})
                 got += 1
                 print(f"  ok {title} ({r.get('source')}): {dur:.0f}s, {lufs} LUFS")
     if len(manifest) < 4:
