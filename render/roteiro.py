@@ -22,12 +22,17 @@ _PRON_RE = [(re.compile(rf"(?<![\wÀ-ú]){re.escape(k)}(?![\wÀ-ú])", re.I), v)
 CONTENT_TYPES = {"gancho", "numero", "lista", "mito_verdade", "passos", "comparacao", "pergunta", "destaque"}
 
 
-def falar(text: str) -> str:
-    """Texto que a voz lê: números por extenso e palavras estrangeiras escritas como se pronunciam."""
-    t = S.speakable(text)
+def respell(t: str) -> str:
+    """Palavras estrangeiras escritas como se pronunciam. Só para a voz Kokoro: o Chatterbox já pronuncia
+    "Black Friday" e "air fryer" certo com a grafia original (o teste com o Whisper mostrou isso)."""
     for rx, v in _PRON_RE:
         t = rx.sub(v, t)
     return t
+
+
+def falar(text: str) -> str:
+    """Texto que a voz lê: números e preços por extenso, sem símbolos."""
+    return S.speakable(text)
 
 
 def L(text: str, say: str | None = None) -> dict:

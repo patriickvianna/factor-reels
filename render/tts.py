@@ -112,7 +112,8 @@ def synth_all(texts: list[str], voice: str) -> list[np.ndarray]:
                 tries += 1
             raw.append(a)
     else:
-        raw = _kokoro_batch(texts, voice)
+        import roteiro
+        raw = _kokoro_batch([roteiro.respell(t) for t in texts], voice)
     out = []
     for t, a in zip(texts, raw):
         a = _trim(np.asarray(a, dtype="float32"))
