@@ -16,7 +16,7 @@ from pathlib import Path
 import script as S
 import tts
 
-HANDLE = "@factorofertas"
+HANDLE = "@factorofertas"  # padrão; cada trabalho traz o @ configurado no painel (Conexões → Instagram)
 PRON = json.loads((Path(__file__).resolve().parent.parent / "voz" / "pronuncia.json").read_text(encoding="utf-8"))
 _PRON_RE = [(re.compile(rf"(?<![\wÀ-ú]){re.escape(k)}(?![\wÀ-ú])", re.I), v) for k, v in sorted(PRON["palavras"].items(), key=lambda kv: -len(kv[0]))]
 
@@ -58,6 +58,10 @@ def cta(seed: int, oferta: int | None = None, ofertas: list[int] | None = None, 
 
 
 def build(job: dict) -> dict:
+    global HANDLE
+    h = str(job.get("handle") or "").strip().lstrip("@").lower()
+    if re.fullmatch(r"[a-z0-9._]{1,30}", h):
+        HANDLE = "@" + h
     seed = int(job["id"])
     kind = job["kind"]
     if kind == "conteudo":
@@ -199,7 +203,7 @@ def _alerta(job: dict, seed: int) -> dict:
     cap = [f"🚨 {o['title']}", "", f"De {S.money_text(orig)} por {S.money_text(price)} (-{off}%)" if off >= 5 else f"Por {S.money_text(price)}"]
     if badge_txt:
         cap.append(f"✔ {badge_txt}")
-    cap += ["", f"🔗 Link na bio → oferta #{o['id']}", "Curte e segue a @factorofertas: achado novo todo dia.", "Preço e estoque podem mudar a qualquer momento."]
+    cap += ["", f"🔗 Link na bio → oferta #{o['id']}", f"Curte e segue a {HANDLE}: achado novo todo dia.", "Preço e estoque podem mudar a qualquer momento."]
     tags = S._hashtags(o.get("hashtags"), "#achadinhos #ofertas #reels")
     return {"kind": "alerta", "scenes": scenes, "caption": "\n".join(cap) + "\n\n" + tags, "hashtags": tags, "title": f"Alerta: {name}", "mood": "urgente"}
 
@@ -223,7 +227,7 @@ def _lista(job: dict, seed: int) -> dict:
                        "lines": [L(f"{ordinals[i]}: {name}."), L(f"Por {S.money_text(float(o['price']))}" + (f", {off}% mais barato." if off >= 10 else "."))]})
     scenes.append(cta(seed, ofertas=[o["id"] for o in offers]))
     cap = [f"🛒 {title.capitalize()} {sub}", ""] + [f"{i + 1}. {S.short_name(o['title'], 6, 48)} · {S.money_text(float(o['price']))} → oferta #{o['id']}" for i, o in enumerate(offers)]
-    cap += ["", "🔗 Todos os links na bio, pelo número da oferta.", "Curte e segue a @factorofertas: achado novo todo dia.", "Preço e estoque podem mudar a qualquer momento."]
+    cap += ["", "🔗 Todos os links na bio, pelo número da oferta.", f"Curte e segue a {HANDLE}: achado novo todo dia.", "Preço e estoque podem mudar a qualquer momento."]
     tags = S._hashtags(offers[0].get("hashtags"), "#achadinhos #ofertas #reels")
     return {"kind": "lista", "scenes": scenes, "caption": "\n".join(cap) + "\n\n" + tags, "hashtags": tags, "title": title.capitalize(), "mood": "animada"}
 

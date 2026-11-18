@@ -16,6 +16,8 @@ W, H, FPS = 1080, 1920, 30
 
 def _page_html(script: dict, timeline: dict) -> str:
     html = (HERE / "scene.html").read_text(encoding="utf-8")
+    import roteiro  # o @ configurado no painel (Conexões → Instagram)
+    html = html.replace("@factorofertas", roteiro.HANDLE)
     data = json.dumps({"script": script, "timeline": timeline}, ensure_ascii=False).replace("</", "<\\/")
     return html.replace("<script>\nconst D = window.DATA;", f"<script>window.DATA = {data};</script>\n<script>\nconst D = window.DATA;", 1)
 
