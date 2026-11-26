@@ -36,4 +36,5 @@ export type ReelProps = {
   audio: string; // arquivo dentro de public/
   duration: number;
   handle: string;
+  modelo?: "v1" | "v2";
 };

@@ -118,6 +118,7 @@ def produce(job: dict, work: Path) -> dict:
     sh("ffmpeg", "-v", "error", "-y", "-i", str(m["final"]), "-ar", "48000", "-ac", "2", str(final48))
     props = roteiro.props(plan, tl, "")
     props["audio_file"] = str(final48)
+    props["modelo"] = job.get("modelo") or "v1"  # v2 = modelo novo (GUT #96), escolhido no painel
     render_remotion(props, mp4, cover)
     info = video.probe(mp4)
     video.check(info, dur)

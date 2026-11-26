@@ -4,7 +4,7 @@ import React from "react";
 import { AbsoluteFill, Easing, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { Confetti } from "./remocn/confetti";
 import { Chat, Historia, Tela } from "./story";
-import { C, SAFE, SAFE_W } from "./theme";
+import { C, SAFE, SAFE_W, useModelo } from "./theme";
 import type { Scene } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -52,6 +52,17 @@ export const RiseText: React.FC<{ text: string; at: number; size: number; color?
 
 const Kicker: React.FC<{ text: string; at?: number }> = ({ text, at = 0 }) => {
   const p = usePop(at, 12);
+  const v2 = useModelo() === "v2";
+  const rise = useRise(at, 12);
+  if (v2) {
+    // v2: rótulo em caixa-alta espaçada com barra de marca, sem brilho e sem pulo
+    return (
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 16, color: C.peach, fontWeight: 700, fontSize: 34, letterSpacing: "0.2em", textTransform: "uppercase", opacity: rise, translate: `${(1 - rise) * -20}px 0` }}>
+        <span style={{ width: 8, height: 38, borderRadius: 4, background: C.orange }} />
+        {text}
+      </div>
+    );
+  }
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 14, background: C.orange, color: C.white, fontWeight: 700, fontSize: 38, letterSpacing: "0.06em", padding: "14px 28px", borderRadius: 999, scale: String(0.6 + 0.4 * p), opacity: Math.min(1, p * 2), transformOrigin: "left center", boxShadow: "0 12px 40px rgba(240,90,26,.45)", textTransform: "uppercase" }}>
       <span style={{ width: 16, height: 16, borderRadius: 99, background: C.white }} />
@@ -98,11 +109,33 @@ const Xmark: React.FC<{ size?: number }> = ({ size = 64 }) => (
   </span>
 );
 
+/** v2: colchetes de foco que fecham sobre o número em 0,45 s, como um visor. */
+const FocusBrackets: React.FC<{ at: number; children: React.ReactNode }> = ({ at, children }) => {
+  const frame = useCurrentFrame();
+  const p = interpolate(frame, [at, at + 14], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+  const gap = 40 * (1 - p) + 18;
+  const L = 46;
+  const S = 7;
+  const corner = (pos: React.CSSProperties, bt: "top" | "bottom", lr: "left" | "right"): React.ReactNode => (
+    <span style={{ position: "absolute", width: L, height: L, opacity: p, ...pos, [`border${bt[0].toUpperCase() + bt.slice(1)}`]: `${S}px solid ${C.peach}`, [`border${lr[0].toUpperCase() + lr.slice(1)}`]: `${S}px solid ${C.peach}` }} />
+  );
+  return (
+    <div style={{ position: "relative", display: "inline-block", padding: "26px 34px" }}>
+      {corner({ top: -gap + 18, left: -gap + 18 }, "top", "left")}
+      {corner({ top: -gap + 18, right: -gap + 18 }, "top", "right")}
+      {corner({ bottom: -gap + 18, left: -gap + 18 }, "bottom", "left")}
+      {corner({ bottom: -gap + 18, right: -gap + 18 }, "bottom", "right")}
+      {children}
+    </div>
+  );
+};
+
 // ---------- conteúdo ----------
 
 const Gancho: React.FC<{ s: Extract<Scene, { type: "gancho" }> }> = ({ s }) => {
   const frame = useCurrentFrame();
-  const punch = interpolate(frame, [0, 6, 14], [1.12, 0.98, 1], clamp);
+  const v2 = useModelo() === "v2";
+  const punch = v2 ? 1 : interpolate(frame, [0, 6, 14], [1.12, 0.98, 1], clamp);
   return (
     <Box gap={44}>
       {s.kicker ? <Kicker text={s.kicker} /> : null}
@@ -116,10 +149,23 @@ const Gancho: React.FC<{ s: Extract<Scene, { type: "gancho" }> }> = ({ s }) => {
 const Numero: React.FC<{ s: Extract<Scene, { type: "numero" }> }> = ({ s }) => {
   const at = useLineAt(s);
   const p = usePop(at(0), 11);
+  const v2 = useModelo() === "v2";
+  const big = s.numero.length > 6 ? 200 : 280;
+  if (v2) {
+    return (
+      <Box gap={30}>
+        {s.kicker ? <Kicker text={s.kicker} /> : null}
+        <FocusBrackets at={at(0)}>
+          <div style={{ fontSize: big, fontWeight: 700, color: C.orange, letterSpacing: "-0.05em", lineHeight: 0.9, opacity: Math.min(1, p * 1.6) }}>{s.numero}</div>
+        </FocusBrackets>
+        <RiseText text={s.rotulo} at={at(0) + 8} size={70} color={C.cream} />
+      </Box>
+    );
+  }
   return (
     <Box gap={30}>
       {s.kicker ? <Kicker text={s.kicker} /> : null}
-      <div style={{ fontSize: s.numero.length > 6 ? 200 : 280, fontWeight: 700, color: C.orange, letterSpacing: "-0.05em", lineHeight: 0.9, scale: String(0.5 + 0.5 * p), transformOrigin: "left center", textShadow: "0 20px 60px rgba(240,90,26,.35)" }}>{s.numero}</div>
+      <div style={{ fontSize: big, fontWeight: 700, color: C.orange, letterSpacing: "-0.05em", lineHeight: 0.9, scale: String(0.5 + 0.5 * p), transformOrigin: "left center", textShadow: "0 20px 60px rgba(240,90,26,.35)" }}>{s.numero}</div>
       <RiseText text={s.rotulo} at={at(0) + 8} size={70} color={C.cream} />
     </Box>
   );

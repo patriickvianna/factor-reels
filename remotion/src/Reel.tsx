@@ -3,7 +3,8 @@ import React from "react";
 import { AbsoluteFill, Audio, Easing, interpolate, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { SceneView } from "./scenes";
 import { OWN_CAPTION } from "./story";
-import { C, FONT, loadBrandFonts, SAFE, SAFE_W } from "./theme";
+import { BackgroundV2, BrandV2, CaptionsV2, ProgressV2, SceneShellV2 } from "./reelV2";
+import { C, FONT, loadBrandFonts, ModelCtx, SAFE, SAFE_W } from "./theme";
 import type { CaptionPage, ReelProps, Scene } from "./types";
 
 loadBrandFonts();
@@ -85,8 +86,30 @@ const SceneShell: React.FC<{ scene: Scene; index: number; last: boolean }> = ({ 
   );
 };
 
-export const Reel: React.FC<ReelProps> = ({ scenes, pages, audio }) => {
+export const Reel: React.FC<ReelProps> = ({ scenes, pages, audio, modelo }) => {
   const { fps } = useVideoConfig();
+  if (modelo === "v2") {
+    return (
+      <ModelCtx.Provider value="v2">
+        <AbsoluteFill style={{ fontFamily: `${FONT}, sans-serif`, color: C.white, background: C.navy }}>
+          <BackgroundV2 />
+          <BrandV2 />
+          <ProgressV2 />
+          {scenes.map((s, i) => {
+            const from = Math.round(s.start * fps);
+            const to = Math.round(s.end * fps);
+            return (
+              <Sequence key={i} from={from} durationInFrames={Math.max(1, to - from)} layout="none">
+                <SceneShellV2 scene={s} last={i === scenes.length - 1} />
+              </Sequence>
+            );
+          })}
+          <CaptionsV2 scenes={scenes} />
+          {audio ? <Audio src={staticFile(audio)} /> : null}
+        </AbsoluteFill>
+      </ModelCtx.Provider>
+    );
+  }
   return (
     <AbsoluteFill style={{ fontFamily: `${FONT}, sans-serif`, color: C.white, background: C.navy }}>
       <Background />

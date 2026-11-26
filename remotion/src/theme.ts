@@ -1,5 +1,11 @@
 import { loadFont } from "@remotion/fonts";
+import { createContext, useContext } from "react";
 import { staticFile } from "remotion";
+
+// Modelo visual do Reels: "v1" (original) ou "v2" (26/11: legenda em faixa, movimento calmo, sem brilho).
+export type Modelo = "v1" | "v2";
+export const ModelCtx = createContext<Modelo>("v1");
+export const useModelo = () => useContext(ModelCtx);
 
 // Marca Factor Ofertas
 export const C = {
