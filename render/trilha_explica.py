@@ -73,6 +73,8 @@ def build(seconds: float) -> np.ndarray:
     rng = np.random.default_rng(11)
 
     def put(buf: np.ndarray, s: int, x: np.ndarray) -> None:
+        if s >= total:  # nota que começaria depois do fim da trilha
+            return
         e = min(total, s + len(x))
         buf[s:e] += x[: e - s]
 
