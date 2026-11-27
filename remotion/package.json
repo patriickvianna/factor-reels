@@ -8,14 +8,18 @@
     "render": "node render.mjs"
   },
   "dependencies": {
+    "@react-three/fiber": "9.4.0",
     "@remotion/bundler": "4.0.543",
     "@remotion/cli": "4.0.543",
     "@remotion/fonts": "^4.0.543",
     "@remotion/renderer": "4.0.543",
+    "@remotion/three": "4.0.543",
+    "@types/three": "0.171.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-peeps": "^0.1.10",
-    "remotion": "4.0.543"
+    "remotion": "4.0.543",
+    "three": "0.171.0"
   },
   "devDependencies": {
     "@types/react": "19.2.2",
