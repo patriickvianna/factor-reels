@@ -9,8 +9,10 @@ on:
     inputs:
       tema: { description: "Tema (airfryer ou coracao)", default: "airfryer" }
       partes: { description: "Em quantas máquinas dividir (4 a 8)", default: "6" }
+      preparo_run: { description: "Reaproveitar a voz de outra rodada (nº da rodada; vazio = gerar de novo)", default: "" }
 permissions:
   contents: write
+  actions: read
 jobs:
   preparar:
     runs-on: ubuntu-24.04
@@ -26,7 +28,12 @@ jobs:
         with: { python-version: "3.11" }
       - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg espeak-ng
       # mesmos caches do robô de Reels: a voz da Dora (Chatterbox) e o Whisper já ficam baixados
+      - name: Reaproveitar a voz de outra rodada
+        if: inputs.preparo_run != ''
+        uses: actions/download-artifact@v4
+        with: { name: preparo, path: out, run-id: "${{ inputs.preparo_run }}", github-token: "${{ github.token }}" }
       - name: Modelos em cache (vozes e conferência da fala)
+        if: inputs.preparo_run == ''
         uses: actions/cache@v4
         with:
           path: |
@@ -34,6 +41,7 @@ jobs:
             ~/.cache/huggingface
           key: modelos-v2-chatterbox-kokoro-whisper
       - name: Ambientes Python em cache
+        if: inputs.preparo_run == ''
         id: venvs
         uses: actions/cache@v4
         with:
@@ -42,7 +50,7 @@ jobs:
             /opt/venv-kokoro
           key: venvs-v2-${{ steps.py.outputs.python-version }}-${{ hashFiles('render/requirements.txt') }}
       - name: Instalar a voz e a conferência (só na primeira vez)
-        if: steps.venvs.outputs.cache-hit != 'true'
+        if: inputs.preparo_run == '' && steps.venvs.outputs.cache-hit != 'true'
         shell: bash
         run: |
           sudo mkdir -p /opt/venv-main /opt/venv-kokoro && sudo chown -R "$USER" /opt/venv-main /opt/venv-kokoro
@@ -52,6 +60,7 @@ jobs:
           python -m venv /opt/venv-kokoro
           /opt/venv-kokoro/bin/pip install -q kokoro-onnx==0.4.9 soundfile
       - name: Voz da Dora, tempo de cada palavra e trilha
+        if: inputs.preparo_run == ''
         shell: bash
         run: |
           /opt/venv-main/bin/pip install -q scipy
@@ -80,7 +89,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund && npx remotion browser ensure
           sed -i "s|\"audio_file\": \"[^\"]*\"|\"audio_file\": \"$GITHUB_WORKSPACE/out/voz.wav\"|" ../out/props.json
-          REMOTION_GL=angle REMOTION_CONCURRENCY=4 node render-explica.mjs ../out/props.json ../p${{ matrix.parte }}.mp4 --part=${{ matrix.parte }}/${{ inputs.partes }}
+          REMOTION_GL=swangle REMOTION_CONCURRENCY=3 node render-explica.mjs ../out/props.json ../p${{ matrix.parte }}.mp4 --part=${{ matrix.parte }}/${{ inputs.partes }}
       - uses: actions/upload-artifact@v4
         with: { name: "parte-${{ matrix.parte }}", path: "p${{ matrix.parte }}.mp4" }
 
