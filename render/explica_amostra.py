@@ -2,9 +2,13 @@
 
 Uso local: python render/explica_amostra.py airfryer out/explica   →  out/explica/props.json + voz.wav
 
-O instante de cada palavra sai assim: cada trecho entre vírgulas/pontos é falado separado (limites exatos),
-e dentro do trecho o tempo é dividido pelo nº de fonemas de cada palavra. No robô do GitHub, o Whisper
-(asr.py) troca essa estimativa pelo instante ouvido de verdade.
+Voz (EXPLICA_VOZ):
+  - cb_dora (padrão, decisão do PTK em 27/11): Chatterbox com o timbre da Dora; o instante de cada palavra
+    vem do Whisper (asr.py), que ouve a fala gerada. Roda no GitHub (modelos em cache).
+  - pm_alex/pf_dora: Kokoro (reserva, sotaque de estrangeiro). Cada trecho entre vírgulas/pontos é falado
+    separado e, dentro do trecho, o tempo é dividido pelo nº de fonemas de cada palavra.
+Música: trilha "curiosidade" gerada em código (trilha_explica.py), uns 12 dB abaixo da voz e abaixando
+mais quando o locutor fala. Volume final de -12 LUFS (o PTK achou -14 baixo).
 """
 from __future__ import annotations
 
@@ -19,10 +23,12 @@ import soundfile as sf
 
 sys.path.insert(0, str(Path(__file__).parent))
 import audio  # noqa: E402
+import trilha_explica  # noqa: E402
 
 SR = 24000
 MODEL = os.environ.get("KOKORO_DIR", "/home/claude/models")
-VOICE = os.environ.get("EXPLICA_VOZ", "pm_alex")
+VOICE = os.environ.get("EXPLICA_VOZ", "cb_dora")
+LUFS = -12.0
 SPEED = 1.06
 
 # (legenda, fala). A fala só muda a pronúncia; precisa ter o mesmo nº de palavras da legenda.
@@ -82,14 +88,12 @@ def _norm(w: str) -> str:
     return re.sub(r"[^\wà-úÀ-Ú]", "", w.lower())
 
 
-def build(tema: str, outdir: Path) -> dict:
-    cfg = TEMAS[tema]
+def _voz_kokoro(cfg: dict, outdir: Path) -> tuple[Path, list, float]:
     tts, tok = _kokoro()
-    outdir.mkdir(parents=True, exist_ok=True)
     chunks: list[np.ndarray] = [np.zeros(int(LEAD_IN * SR), dtype=np.float32)]
     t = LEAD_IN
-    lines, cues = [], {}
-    for cap, say, cue_words in cfg["linhas"]:
+    lines = []
+    for cap, say, _cues in cfg["linhas"]:
         say = say or cap
         cap_pieces, say_pieces = _pieces(cap), _pieces(say)
         assert len(cap_pieces) == len(say_pieces), (cap, say)
@@ -113,23 +117,65 @@ def build(tema: str, outdir: Path) -> dict:
             gap = PAUSE_STOP if punct in ".:;!?" else PAUSE_COMMA if punct == "," else 0.05
             chunks.append(np.zeros(int(gap * SR), dtype=np.float32))
             t += gap
-        for w in line_words:
-            k = _norm(w["text"])
-            if k in cue_words and cue_words[k] not in cues:
-                cues[cue_words[k]] = w["start"]
         lines.append({"text": cap, "start": round(line_start, 3), "end": line_words[-1]["end"], "words": line_words})
         chunks.append(np.zeros(int(PAUSE_LINE * SR), dtype=np.float32))
         t += PAUSE_LINE
     chunks.append(np.zeros(int(TAIL * SR), dtype=np.float32))
     raw = outdir / "voz_bruta.wav"
     sf.write(raw, np.concatenate(chunks), SR)
+    return raw, lines, round(t + TAIL - PAUSE_LINE, 2)
+
+
+def _voz_chatterbox(cfg: dict, outdir: Path) -> tuple[Path, list, float]:
+    import tts
+    script = {"scenes": [{"lines": [{"text": cap, "say": say or cap}]} for cap, say, _ in cfg["linhas"]]}
+    raw = outdir / "voz_bruta.wav"
+    tl = tts.narrate(script, VOICE, raw, lead_in=LEAD_IN, tail=TAIL)
+    lines = [ln for sc in tl["scenes"] for ln in sc["lines"]]
+    falta = [ln["text"] for ln in lines if not ln.get("words")]
+    if falta:
+        raise RuntimeError(f"sem o tempo das palavras (Whisper) em: {falta[0]!r}")
+    return raw, lines, tl["duration"]
+
+
+def _mix(raw: Path, duration: float, outdir: Path) -> Path:
+    """Voz tratada + trilha baixa que abaixa mais quando o locutor fala; volume final em LUFS."""
+    trilha = outdir / "trilha.wav"
+    y = trilha_explica.build(duration + 0.5)
+    sf.write(trilha, np.stack([y, y], 1), trilha_explica.SR)
+    graph = (f"[0:a]{audio.VOICE_CHAIN},apad=whole_dur={duration:.3f}[v];"
+             f"[1:a]aresample=48000,loudnorm=I=-26:TP=-8:LRA=7,afade=t=in:st=0:d=1.0,"
+             f"afade=t=out:st={max(0.1, duration - 2):.3f}:d=2[m];"
+             "[v]asplit=2[vk][vm];"
+             "[m][vk]sidechaincompress=threshold=0.03:ratio=3:attack=30:release=450:makeup=1[duck];"
+             "[vm][duck]amix=inputs=2:normalize=0:duration=first[mix]")
+    pre = outdir / "mix_pre.wav"
+    audio._run(["-i", str(raw), "-i", str(trilha), "-filter_complex", graph, "-map", "[mix]", "-t", f"{duration:.3f}",
+                "-ac", "2", "-c:a", "pcm_s16le", str(pre)])
+    audio.TARGET_I = LUFS
     final = outdir / "voz.wav"
-    audio.normalize(raw, final, pre=audio.VOICE_CHAIN)
-    duration = round(t + TAIL - PAUSE_LINE, 2)
+    audio.normalize(pre, final)
+    m = audio.measure(final)
+    if abs(m["lufs"] - LUFS) > 1.0 or m["true_peak"] > -0.85:
+        raise audio.QualityError(f"som fora do padrão: {m['lufs']} LUFS, pico {m['true_peak']} dBTP")
+    return final
+
+
+def build(tema: str, outdir: Path) -> dict:
+    cfg = TEMAS[tema]
+    outdir.mkdir(parents=True, exist_ok=True)
+    raw, lines, duration = (_voz_chatterbox if VOICE.startswith("cb_") else _voz_kokoro)(cfg, outdir)
+    cues = {}
+    for ln, (_, _, cue_words) in zip(lines, cfg["linhas"]):
+        for w in ln["words"]:
+            k = _norm(w["text"])
+            if k in cue_words and cue_words[k] not in cues:
+                cues[cue_words[k]] = w["start"]
     missing = sorted({v for _, _, c in cfg["linhas"] for v in c.values()} - set(cues))
     assert not missing, f"cues sem palavra: {missing}"
+    final = _mix(raw, duration, outdir)
     props = {"tema": tema, "titulo": cfg["titulo"], "lines": lines, "cues": cues, "audio_file": str(final.resolve()),
-             "audio": "", "duration": duration, "handle": "@factorofertas"}
+             "audio": "", "duration": duration, "handle": "@factorofertas", "voz": VOICE}
     (outdir / "props.json").write_text(json.dumps(props, ensure_ascii=False, indent=1))
     return props
 
